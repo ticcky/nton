@@ -21,7 +21,10 @@ class LSTM(ParametrizedBlock):
 
         self.parametrize(params, grads)
 
-    def forward(self, (x, c0, h0 )):
+    def get_init(self):
+        return (np.zeros((self.n_cells, )), np.zeros((self.n_cells, )))
+
+    def forward(self, (x, h0, c0 )):
         """
         X should be of shape (t,b,input_size), where t = length of sequence, b = batch size
         """
@@ -70,7 +73,7 @@ class LSTM(ParametrizedBlock):
 
         aux = Vars(**cache)
 
-        return ((Hout, ), aux)
+        return ((Hout, C), aux)  # TODO: Do proper gradient backward for C
 
     def backward(self, inputs, aux, grads):          
           dy = grads[0]

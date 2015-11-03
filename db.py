@@ -4,6 +4,15 @@ from nn import Block, Vars, Dot, Softmax
 
 from vocab import Vocab
 
+VOCAB = """i would like some chinese food
+what about indian
+give me czech
+i like english food
+ok chong is a good place
+i have taj here
+go to hospoda
+tavern is not bad
+"""
 
 class DB(Block):
     content = [
@@ -16,6 +25,8 @@ class DB(Block):
     def __init__(self):
         self.vocab = Vocab()
         self.vocab.add('#OOV')
+        for word in VOCAB.split():
+            self.vocab.add(word)
 
         for food, restaurant in self.content:
             self.vocab.add(food)
@@ -36,6 +47,13 @@ class DB(Block):
             entries_c.append(entry)
 
         self.entries_c = np.array(entries_c)
+
+    def words_to_ids(self, words):
+        res = []
+        for word in words:
+            res.append(self.vocab.add(word))
+
+        return res
 
     def get_vector(self, *words):
         res = np.zeros((len(self.vocab), ))
@@ -87,6 +105,4 @@ class DB(Block):
         (dA, dx) = Dot.backward((self.entries_a, x), Ax_aux, (dp1.T, ))
 
         return (dx[:, 0], )
-
-
 
