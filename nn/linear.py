@@ -30,13 +30,22 @@ class LinearLayer(ParametrizedBlock):
         W = self.params['W']
         b = self.params['b']
 
-        return ((np.dot(x, W) + b), None)
+        y = np.dot(x, W) + b
+
+        aux = Vars(
+            y=y
+        )
+
+        return ((y, ), aux)
 
     def backward(self, (x, ), aux, (dy, )):
+        y = aux['y']
+
         W = self.params['W']
         self.grad_accum(x, y, dy)
+        res = np.dot(dy, W.T)
 
-        return np.dot(dy, W.T)
+        return (res, )
 
     def grad_accum(self, x, y, dy):
         x = x.reshape((-1, x.shape[-1]))

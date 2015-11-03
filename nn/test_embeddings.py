@@ -1,9 +1,17 @@
 import numpy as np
 from unittest import TestCase, main
 
-from embeddings import Embeddings
+from embeddings import Embeddings, OneHot
 from utils import TestParamGradInLayer, check_finite_differences
 from vars import Vars
+
+
+class TestOneHot(TestCase):
+    def test_forward(self):
+        hot = OneHot(n_tokens=7)
+
+        ((y, ), aux) = hot.forward((np.array([1, 6, 3]), ))
+
 
 
 class TestEmbeddings(TestCase):

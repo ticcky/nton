@@ -1,8 +1,19 @@
 import numpy as np
 
-from base import ParametrizedBlock
+from base import ParametrizedBlock, Block
 from inits import Normal
 from vars import Vars
+
+
+class OneHot(Block):
+    def __init__(self, n_tokens):
+        self.n_tokens = n_tokens
+
+    def forward(self, (x, )):
+        res = np.zeros((len(x), self.n_tokens))
+        res[range(len(x)), x] = 1
+
+        return ((res, ), None)
 
 
 class Embeddings(ParametrizedBlock):
