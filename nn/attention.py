@@ -28,7 +28,6 @@ class Attention(ParametrizedBlock):
         Y = h_out
         n_inputs = len(h_out)
 
-        #h_out_flat = h_out.reshape((-1, self.n_hid))
         ((Wy_apply, ), Wy_aux) = Dot.forward((h_out, Wy, ))
         ((Wh_apply, ), Wh_aux) = Dot.forward((g_t, Wh ))
 
@@ -40,9 +39,7 @@ class Attention(ParametrizedBlock):
         ((Mw, ), Mw_aux) = Dot.forward((M, w))
 
         MwT = Mw.T
-
-
-
+        
         ((alpha, ), alpha_aux) = Softmax.forward((MwT, ))
 
         alphaT = alpha.T

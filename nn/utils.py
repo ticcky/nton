@@ -41,7 +41,7 @@ def check_finite_differences(fwd_fn, bwd_fn, delta=1e-5, n_times=10, gen_input_f
                 else:
                     rel_error = abs(grad_an - grad_num) / abs(grad_an + grad_num)
                     if rel_error > 1e-2:
-                        print 'GRADIENT WARNING', 'dim', dim, 'val', x
+                        print 'GRADIENT WARNING', 'inp', i, 'dim', dim, 'val', x
                         print 'analytic', grad_an, 'num', grad_num
                         print 'rel error', rel_error
                         if rel_error > 1:

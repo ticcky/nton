@@ -1,9 +1,11 @@
 import numpy as np
 
+from nn import Block, Vars, Dot, Softmax
+
 from vocab import Vocab
 
 
-class DB(object):
+class DB(Block):
     content = [
         ('chinese', 'chong'),
         ('indian', 'taj'),
@@ -51,66 +53,40 @@ class DB(object):
         ex = np.exp(x)
         return ex / np.sum(ex)
 
-    def forward(self, x):
-        Ax = np.dot(self.entries_a, x)[:, np.newaxis]
-        p1 = self.softmax(Ax)
-        res = (p1 * self.entries_c).sum(axis=0)
-        resp = self.softmax(res)
+    def forward(self, (x, )):
+        ((Ax, ), Ax_aux) = Dot.forward((self.entries_a, x))
+        ((p1, ), p1_aux) = Softmax.forward((Ax.T, ))
 
-        return resp
+        p1C = p1.T * self.entries_c
+        w = np.sum(p1C, axis=0)
 
-    def backward(self, x):
-        n_vocab = len(self.vocab)
-        n_ents = len(self.content)
+        ((result, ), result_aux) = Softmax.forward((w, ))
 
-        Ax = np.dot(self.entries_a, x)[:, np.newaxis]
-        p1 = self.softmax(Ax)
-        alpha = (p1 * self.entries_c).sum(axis=0)
+        aux = Vars(
+            w=w,
+            result_aux=result_aux,
+            Ax=Ax,
+            Ax_aux=Ax_aux,
+            p1_aux=p1_aux
+        )
 
-        c = self.entries_c
+        return ((result, ), aux)
 
-        res = np.zeros((n_vocab, n_vocab))
-        for i in range(n_ents):
-            li = np.zeros((n_ents, ))
-            for j in range(n_ents):
-                if i == j:
-                    li[j] = p1[i] * (1 - p1[i])
-                else:
-                    li[j] = - p1[i] * p1[j]
+    def backward(self, (x, ), aux, (dy, )):
+        w = aux['w']
+        result_aux = aux['result_aux']
+        Ax = aux['Ax']
+        Ax_aux = aux['Ax_aux']
+        p1_aux = aux['p1_aux']
 
-            res += np.dot(np.outer(c[i], li), self.entries_a)
+        (dresult, ) = Softmax.backward((w, ), result_aux, (dy, ))
 
+        dp1C_dp1 = (self.entries_c * dresult).sum(axis=1)
 
-        j2 = np.outer(alpha, alpha)
-        for i in range(n_vocab):
-            j2[i, i] += alpha[i]
+        (dp1, ) = Softmax.backward((Ax.T, ), p1_aux, (dp1C_dp1, ))
+        (dA, dx) = Dot.backward((self.entries_a, x), Ax_aux, (dp1.T, ))
 
-        res = np.dot(j2, res)
-
-        return res
-
-    # def forward(self, words, weights):
-    #     u = self.get_vector()
-    #     for word, weight in zip(words, weights):
-    #         u += self.get_vector(word) * weight
-    #
-    #     p = self.build_p(u)
-    #     psoft = self.softmax(p)
-    #     o = np.sum(self.entries_c * p[:, np.newaxis], axis=0)
-    #     a_hat = self.softmax(o + u)
-    #
-    #     #print self.vocab.rev(np.argmax(a_hat))
-    #
-    #     return a_hat
-    #
-    # def backward(self, y, dy):
-    #     dy_dsoftmax = dy * y * (1 - y)
-    #     dy_do = dy_dsoftmax
-    #     dy_du = dy_dsoftmax
-    #
-    #     import ipdb; ipdb.set_trace()
-    #     dy_dp = np.dot(dy_do, self.entries_c.T)
-
+        return (dx[:, 0], )
 
 
 
