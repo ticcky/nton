@@ -79,10 +79,8 @@ class Attention(ParametrizedBlock):
         Wh_aux = aux['Wh_aux']
         Wy_aux = aux['Wy_aux']
 
-        seq_len = emb_in.shape[0]
-
         dalphaT = np.dot(dquery, emb_in.T)
-        demb_in = np.outer(dquery, alpha)
+        demb_in = np.outer(dquery, alpha).T
 
         (dalpha, ) = Softmax.backward((MwT, ), alpha_aux, (dalphaT.T, ))
 
@@ -98,6 +96,3 @@ class Attention(ParametrizedBlock):
         (dg_t, dWh) = Dot.backward((g_t, Wh), Wh_aux, (dWh_dot_g_t_rep, ))
 
         return (dh_out, dg_t, demb_in)
-
-    def accum_gradients(self, dWLSTM):
-        pass
