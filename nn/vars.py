@@ -48,7 +48,7 @@ class Vars(object):
     def increment_by(self, params_inst, factor=1.0, clip=0.0):
         """Increment all values of variables by their value in params_inst.
         It is useful for updating variables by their gradients."""
-        assert self.var_names == params_inst.param_names
+        assert self.var_names == params_inst.var_names, "%s vs. %s" % (self.var_names, params_inst.var_names, )
 
         for param_name in self:
             grad = params_inst[param_name]

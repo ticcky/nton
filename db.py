@@ -12,6 +12,7 @@ ok chong is a good place
 i have taj here
 go to hospoda
 tavern is not bad
+.
 """
 
 class DB(Block):

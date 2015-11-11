@@ -4,11 +4,10 @@ from nn import LSTM, OneHot, Sequential, LinearLayer, Softmax, Sigmoid, Vars
 from nn.attention import Attention
 from nn.switch import Switch
 from db import DB
+from seq_loss import SeqLoss
 
 
 class NTON(object):
-    max_gen_steps = 7
-
     def __init__(self, n_tokens, n_cells, db):
         self.n_tokens = n_tokens
         self.n_cells = n_cells
@@ -31,11 +30,16 @@ class NTON(object):
         ])
         self.att = Attention(n_hidden=n_cells)
 
+        self.param_layers = [
+            self.output_switch_p,
+            self.output_rnn_clf,
+            self.output_rnn,
+            self.att,
+            self.input_rnn,
+        ]
 
-    def forward(self, words_in, words_out):
-        id_words_in = self.db.words_to_ids(words_in)
-        id_words_out = self.db.words_to_ids(words_out)
 
+    def forward(self, id_words_in, gen_n):
         h0, c0 = self.input_rnn.get_init()
 
         ((E, ), E_aux) = self.emb.forward((id_words_in, ))
@@ -54,11 +58,13 @@ class NTON(object):
         h_t, c_t = self.output_rnn.get_init()
         ((prev_y, ), _) = self.emb.forward(([0], ))
 
-        print 'init prev_y', prev_y
-        print 'init h_t', h_t
-        print 'init c_t', c_t
+        # print 'init prev_y', prev_y
+        # print 'init h_t', h_t
+        # print 'init c_t', c_t
 
-        for i in range(self.max_gen_steps):
+        Y = []
+        #print '---'
+        for i in range(gen_n):
             ((query_t, ), query_t_aux_curr) = self.att.forward((H, h_t, E, ))
 
             ((db_result_t, ), db_result_t_aux_curr) = self.db.forward((query_t, ))
@@ -79,13 +85,21 @@ class NTON(object):
             switch_p_aux.append(switch_p_aux_curr)
             switch_aux.append(switch_aux_curr)
 
-            prev_y_ndx = np.random.choice(self.n_tokens, p=y_t.squeeze())
+            y_t = y_t.squeeze()
+
+            prev_y_ndx = np.random.choice(self.n_tokens, p=y_t)
             ((prev_y, ), _) = self.emb.forward(([prev_y_ndx], ))
+
+            Y.append(y_t)
+
+            #print self.db.vocab.rev(prev_y_ndx)
 
             #print 'next prev_y', prev_y_ndx, prev_y
             #print 'next h_t', h_t
 
-        return Vars(
+        Y = np.array(Y)
+
+        return ((Y, ), Vars(
             E_aux=E_aux,
             H_aux=H_aux,
             query_t_aux=query_t_aux,
@@ -93,8 +107,9 @@ class NTON(object):
             h_t_aux=h_t_aux,
             rnn_result_aux=rnn_result_aux,
             switch_p_aux=switch_p_aux,
-            switch_aux=switch_aux
-        )
+            switch_aux=switch_aux,
+            gen_n=gen_n
+        ))
 
     def backward(self, aux, grads):
         H_aux = aux['H_aux']
@@ -107,7 +122,7 @@ class NTON(object):
 
         dh_tm1 = None
         dH = None
-        for i in range(self.max_gen_steps - 1, -1, -1):
+        for i in range(aux['gen_n'] - 1, -1, -1):
             (dp1, din1, din2, ) = Switch.backward(switch_aux[i], (grads[i], ))
             (dh_t_1, ) = self.output_switch_p.backward(switch_p_aux[i], (dp1, ))
             (dh_t_2, ) = self.output_rnn_clf.backward(rnn_result_aux[i], (din1, ))
@@ -128,7 +143,20 @@ class NTON(object):
         dH = dH[:, np.newaxis, :]
         (dE, dh0, dc0) = self.input_rnn.backward(H_aux, (dH, np.zeros_like(dH)))
 
+    def zero_grads(self):
+        for layer in self.param_layers:
+            layer.grads.zero()
 
+    def update_params(self, lr):
+        for layer in self.param_layers:
+            layer.params.increment_by(layer.grads, factor=-lr)
+
+    def decode(self, Y):
+        res = []
+        for i in range(len(Y)):
+            res.append(self.db.vocab.rev(Y[i].argmax()))
+
+        return res
 
 def main(**kwargs):
     np.set_printoptions(edgeitems=3,infstr='inf',
@@ -142,9 +170,24 @@ def main(**kwargs):
         db=db,
         **kwargs
     )
-    aux = nton.forward("i would like chinese food".split(), "ok chong is good".split())
 
-    nton.backward(aux, [np.ones(nton.n_tokens)] * nton.max_gen_steps)
+
+    for i in range(1000):
+        nton.zero_grads()
+
+        id_words_in = nton.db.words_to_ids("i would like chinese food".split())
+        id_words_out = nton.db.words_to_ids("ok chong is good .".split())
+
+        ((Y, ), aux) = nton.forward(id_words_in, len(id_words_out))
+        ((loss, ), loss_aux) = SeqLoss.forward((Y, id_words_out, ))
+        (dY, ) = SeqLoss.backward(loss_aux, 1.0)
+
+        #print dY.min(axis=1)
+
+        nton.backward(aux, dY)
+        nton.update_params(lr=0.1)
+
+        print loss, Y[np.arange(5), id_words_out], " ".join(nton.decode(Y))
 
 
 

@@ -49,7 +49,6 @@ class Sequential(ParametrizedBlock):
         last_dy = dy
         for i, layer in reversed(list(enumerate(self.layers))):
             last_aux = yaux[i]
-            print layer
             (last_dy, ) = layer.backward(last_aux, (last_dy, ))
 
         return (last_dy, )

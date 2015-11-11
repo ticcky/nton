@@ -4,6 +4,7 @@ class Block(object):
 
 class ParametrizedBlock(Block):
     def parametrize(self, params, grads):
+        assert params.var_names == grads.var_names
         self._params = params
         self._grads = grads
 

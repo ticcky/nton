@@ -16,13 +16,11 @@ class Attention(ParametrizedBlock):
         w = np.random.randn(n_hidden)
 
         params = Vars(Wh=Wh, Wy=Wy, w=w)
-        grads = Vars(Wh=np.zeros_like(Wh), Wy=np.zeros_like(Wy))
+        grads = Vars(Wh=np.zeros_like(Wh), Wy=np.zeros_like(Wy), w=np.zeros_like(w))
 
         self.parametrize(params, grads)
 
     def forward(self, (h_out, g_t, emb_in)):
-        print h_out.shape, g_t.shape, emb_in.shape
-
         Wy = self.params['Wy']
         Wh = self.params['Wh']
         w = self.params['w']
@@ -93,7 +91,7 @@ class Attention(ParametrizedBlock):
 
         dMw = dMwT.T
 
-        print 'xxx', Mw_aux['A'].shape, Mw_aux['B'].shape
+        #print 'xxx', Mw_aux['A'].shape, Mw_aux['B'].shape
 
         (dM, dw) = Dot.backward(Mw_aux, (dMw, ))
         (dMx, ) = Tanh.backward(M_aux, (dM, ))

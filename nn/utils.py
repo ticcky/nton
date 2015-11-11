@@ -45,7 +45,7 @@ def check_finite_differences(fwd_fn, bwd_fn, delta=1e-5, n_times=10, gen_input_f
                 grad_an = grads[i].flat[dim]
 
                 if abs(grad_num) < 1e-7 and abs(grad_an) < 1e-7:
-                    print 'GRADIENT WARNING: gradients too small'
+                    print 'inp', i, 'dim', dim, 'GRADIENT WARNING: gradients too small (num: %.10f, an: %.10f)' % (grad_num, grad_an, )
                 else:
                     rel_error = abs(grad_an - grad_num) / abs(grad_an + grad_num)
                     if rel_error > 1e-2:
