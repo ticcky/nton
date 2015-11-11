@@ -76,8 +76,8 @@ class LSTM(ParametrizedBlock):
         return ((Hout, C), aux)  # TODO: Do proper gradient backward for C
 
     def backward(self, aux, grads):
-          dH = grads[0]
-          dC = grads[1]
+          dH = grads[0].copy()
+          dC = grads[1].copy()
 
           WLSTM = aux['WLSTM']
           Hout = aux['Hout']
@@ -96,11 +96,11 @@ class LSTM(ParametrizedBlock):
           dIFOGf = np.zeros(IFOGf.shape)
           dWLSTM = np.zeros(WLSTM.shape)
           dHin = np.zeros(Hin.shape)
-          dC = np.zeros(C.shape) + grads[1]
+          dC = np.zeros(C.shape) + dC
           dX = np.zeros((n,b,input_size))
           dh0 = np.zeros((b, d))
           dc0 = np.zeros((b, d))
-          dHout = dH.copy() # make a copy so we don't have any funny side effects
+          dHout = dH
 
           for t in reversed(xrange(n)):
 

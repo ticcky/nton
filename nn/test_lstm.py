@@ -16,21 +16,23 @@ class TestLSTM(TestCase):
         self.assertEqual(h.shape, (11, 3, 7))
 
     def test_backward(self):
+        np.random.seed(9)
         def gen():
             x = np.random.randn(5, 3, 10)
-            h0 = np.random.randn(3, 4)
-            c0 = np.random.randn(3, 4)
+            h0 = np.random.randn(3, 4) * 0
+            c0 = np.random.randn(3, 4) * 0
             return (x, h0, c0, )
 
         lstm = LSTM(n_in=10, n_out=4)
 
-        # check = check_finite_differences(
-        #     lstm.forward,
-        #     lstm.backward,
-        #     gen_input_fn=gen,
-        #     aux_only=True
-        # )
-        # self.assertTrue(check)
+        check = check_finite_differences(
+            lstm.forward,
+            lstm.backward,
+            gen_input_fn=gen,
+            aux_only=True,
+            test_inputs=(0, 1, 2, )
+        )
+        self.assertTrue(check)
 
         params_shape = lstm.params['WLSTM'].shape
 
