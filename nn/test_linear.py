@@ -22,7 +22,8 @@ class TestLinearLayer(TestCase):
         check = check_finite_differences(
             fwd_fn=linear.forward,
             bwd_fn=linear.backward,
-            gen_input_fn=lambda: (np.random.randn(30, 10), )
+            gen_input_fn=lambda: (np.random.randn(30, 10), ),
+            aux_only=True
         )
         self.assertTrue(check)
 
@@ -31,7 +32,8 @@ class TestLinearLayer(TestCase):
         check = check_finite_differences(
             fwd_fn=checker.forward,
             bwd_fn=checker.backward,
-            gen_input_fn=lambda: (np.random.randn(*linear.params['W'].shape), )
+            gen_input_fn=lambda: (np.random.randn(*linear.params['W'].shape), ),
+            aux_only=True
         )
         self.assertTrue(check)
 
@@ -39,7 +41,8 @@ class TestLinearLayer(TestCase):
         check = check_finite_differences(
             fwd_fn=checker.forward,
             bwd_fn=checker.backward,
-            gen_input_fn=lambda: (np.random.randn(*linear.params['b'].shape), )
+            gen_input_fn=lambda: (np.random.randn(*linear.params['b'].shape), ),
+            aux_only=True
         )
         self.assertTrue(check)
 

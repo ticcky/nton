@@ -32,8 +32,8 @@ class LSTM(ParametrizedBlock):
 
         n,b,input_size = x.shape
         d = WLSTM.shape[1] / 4 # hidden size
-        if c0 is None: c0 = np.zeros((b,d))
-        if h0 is None: h0 = np.zeros((b,d))
+        #if c0 is None: c0 = np.zeros((b,d))
+        #if h0 is None: h0 = np.zeros((b,d))
 
         # Perform the LSTM forward pass with x as the input
         xphpb = WLSTM.shape[0] # x plus h plus bias, lol
@@ -75,8 +75,9 @@ class LSTM(ParametrizedBlock):
 
         return ((Hout, C), aux)  # TODO: Do proper gradient backward for C
 
-    def backward(self, inputs, aux, grads):          
-          dy = grads[0]
+    def backward(self, aux, grads):
+          dH = grads[0]
+          dC = grads[1]
 
           WLSTM = aux['WLSTM']
           Hout = aux['Hout']
@@ -95,11 +96,11 @@ class LSTM(ParametrizedBlock):
           dIFOGf = np.zeros(IFOGf.shape)
           dWLSTM = np.zeros(WLSTM.shape)
           dHin = np.zeros(Hin.shape)
-          dC = np.zeros(C.shape)
+          dC = np.zeros(C.shape) + grads[1]
           dX = np.zeros((n,b,input_size))
           dh0 = np.zeros((b, d))
           dc0 = np.zeros((b, d))
-          dHout = dy.copy() # make a copy so we don't have any funny side effects
+          dHout = dH.copy() # make a copy so we don't have any funny side effects
 
           for t in reversed(xrange(n)):
 
@@ -134,7 +135,8 @@ class LSTM(ParametrizedBlock):
               dh0 += dHin[t,:,input_size+1:]
 
           self.accum_gradients(dWLSTM)
-          return (dX, )
+
+          return (dX, dh0, dc0)
 
     def accum_gradients(self, dWLSTM):
           self.grads['WLSTM'] += dWLSTM

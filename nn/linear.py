@@ -33,13 +33,15 @@ class LinearLayer(ParametrizedBlock):
         y = np.dot(x, W) + b
 
         aux = Vars(
-            y=y
+            y=y,
+            x=x
         )
 
         return ((y, ), aux)
 
-    def backward(self, (x, ), aux, (dy, )):
+    def backward(self, aux, (dy, )):
         y = aux['y']
+        x = aux['x']
 
         W = self.params['W']
         self.grad_accum(x, y, dy)
@@ -69,10 +71,18 @@ class Dot(ParametrizedBlock):
         if B.ndim == 1:
             B = B[:, np.newaxis]
 
-        return ((np.dot(A, B), ), None)
+        aux = Vars(
+            A=A,
+            B=B
+        )
+
+        return ((np.dot(A, B), ), aux)
 
     @classmethod
-    def backward(self, (A, B, ), aux, (dy, )):
+    def backward(self, aux, (dy, )):
+        A = aux['A']
+        B = aux['B']
+
         if A.ndim == 1:
             A = A[:, np.newaxis]
         if B.ndim == 1:

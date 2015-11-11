@@ -30,7 +30,8 @@ class TestSequential(TestCase):
         check = check_finite_differences(
             fwd_fn=seq.forward,
             bwd_fn=seq.backward,
-            gen_input_fn=lambda: (np.random.randn(3, 5), )
+            gen_input_fn=lambda: (np.random.randn(3, 5), ),
+            aux_only=True
         )
         self.assertTrue(check)
 

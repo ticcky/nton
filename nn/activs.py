@@ -13,7 +13,7 @@ class Tanh(Block):
         return ((y, ), aux)
 
     @classmethod
-    def backward(self, (x, ), aux, (dy, )):
+    def backward(self, aux, (dy, )):
         y = aux['y']
         res = (1 - y * y) * dy
 
@@ -30,7 +30,7 @@ class Sigmoid(Block):
         return ((y, ), aux)
 
     @classmethod
-    def backward(self, (x, ), aux, (dy, )):
+    def backward(self, aux, (dy, )):
         y = aux['y']
 
         res = y * (1 - y) * dy

@@ -11,25 +11,35 @@ class TestLSTM(TestCase):
         lstm = LSTM(n_in=5, n_out=7)
 
         input = np.random.randn(11, 3, 5)
-        ((h, ), aux_lstm) = lstm.forward((input, None, None ))
+        ((h, c, ), aux_lstm) = lstm.forward((input, None, None ))
 
         self.assertEqual(h.shape, (11, 3, 7))
 
     def test_backward(self):
+        def gen():
+            x = np.random.randn(5, 3, 10)
+            h0 = np.random.randn(3, 4)
+            c0 = np.random.randn(3, 4)
+            return (x, h0, c0, )
+
         lstm = LSTM(n_in=10, n_out=4)
 
-        x = np.random.randn(5, 3, 10)
-        c0 = np.random.randn(3, 4)
-        h0 = np.random.randn(3, 4)
-        inp = (x, c0, h0, )
+        # check = check_finite_differences(
+        #     lstm.forward,
+        #     lstm.backward,
+        #     gen_input_fn=gen,
+        #     aux_only=True
+        # )
+        # self.assertTrue(check)
 
         params_shape = lstm.params['WLSTM'].shape
 
-        checker = TestParamGradInLayer(lstm, 'WLSTM', layer_input=inp)
+        checker = TestParamGradInLayer(lstm, 'WLSTM', layer_input=gen())
         check = check_finite_differences(
             checker.forward,
             checker.backward,
-            gen_input_fn=lambda: (np.random.randn(*params_shape), )
+            gen_input_fn=lambda: (np.random.randn(*params_shape), ),
+            aux_only=True
         )
         self.assertTrue(check)
 

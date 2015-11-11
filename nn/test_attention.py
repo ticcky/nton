@@ -31,7 +31,8 @@ class TestAttention(TestCase):
             att.forward,
             att.backward,
             gen_input_fn=gen_input,
-            test_inputs=(0, 1, 2)
+            test_inputs=(0, 1, 2),
+            aux_only=True
         )
         self.assertTrue(check)
 

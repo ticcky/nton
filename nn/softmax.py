@@ -18,7 +18,7 @@ class Softmax(Block):
         return ((res, ), aux, )
 
     @classmethod
-    def backward(self, (x, ), aux, (dy, )):
+    def backward(self, aux, (dy, )):
         y = aux['y']
 
         dy = dy

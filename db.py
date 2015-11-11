@@ -81,6 +81,7 @@ class DB(Block):
         ((result, ), result_aux) = Softmax.forward((w, ))
 
         aux = Vars(
+            x=x,
             w=w,
             result_aux=result_aux,
             Ax=Ax,
@@ -90,19 +91,20 @@ class DB(Block):
 
         return ((result, ), aux)
 
-    def backward(self, (x, ), aux, (dy, )):
+    def backward(self, aux, (dy, )):
+        x = aux['x']
         w = aux['w']
         result_aux = aux['result_aux']
         Ax = aux['Ax']
         Ax_aux = aux['Ax_aux']
         p1_aux = aux['p1_aux']
 
-        (dresult, ) = Softmax.backward((w, ), result_aux, (dy, ))
+        (dresult, ) = Softmax.backward(result_aux, (dy, ))
 
         dp1C_dp1 = (self.entries_c * dresult).sum(axis=1)
 
-        (dp1, ) = Softmax.backward((Ax.T, ), p1_aux, (dp1C_dp1, ))
-        (dA, dx) = Dot.backward((self.entries_a, x), Ax_aux, (dp1.T, ))
+        (dp1, ) = Softmax.backward(p1_aux, (dp1C_dp1, ))
+        (dA, dx) = Dot.backward(Ax_aux, (dp1.T, ))
 
         return (dx[:, 0], )
 

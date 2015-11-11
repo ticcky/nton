@@ -12,12 +12,20 @@ class Switch(Block):
     def forward(self, (p1, in1, in2)):
         res = p1 * in1 + (1 - p1) * in2
 
-        aux = Vars()
+        aux = Vars(
+            p1=p1,
+            in1=in1,
+            in2=in2
+        )
 
         return ((res, ), aux)
 
     @classmethod
-    def backward(self, (p1, in1, in2, ), aux, (dres, )):
+    def backward(self, aux, (dres, )):
+        p1 = aux['p1']
+        in1 = aux['in1']
+        in2 = aux['in2']
+
         din1 = p1 * dres
         din2 = (1 - p1) * dres
 

@@ -27,7 +27,8 @@ class TestSwitch(TestCase):
             Switch.forward,
             Switch.backward,
             gen_input_fn=gen_input,
-            test_inputs=(0, 1, 2)
+            test_inputs=(0, 1, 2),
+            aux_only=True
         )
         self.assertTrue(check)
 

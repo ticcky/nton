@@ -38,25 +38,18 @@ class Sequential(ParametrizedBlock):
             last_y = y
 
         aux = Vars(
-            ycache=ycache,
             yaux=yaux
         )
 
         return ((last_y, ), aux)
 
-    def backward(self, (x, ), aux, (dy, )):
-        ycache = aux['ycache']
+    def backward(self, aux, (dy, )):
         yaux = aux['yaux']
 
         last_dy = dy
         for i, layer in reversed(list(enumerate(self.layers))):
-            if i > 0:
-                last_in = ycache[i - 1]
-            else:
-                last_in = x
-            last_out = ycache[i]
             last_aux = yaux[i]
-            #print type(last_in), type(last_dy)
-            (last_dy, ) = layer.backward((last_in, ),  last_aux, (last_dy, ))
+            print layer
+            (last_dy, ) = layer.backward(last_aux, (last_dy, ))
 
         return (last_dy, )

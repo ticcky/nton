@@ -21,6 +21,8 @@ class Attention(ParametrizedBlock):
         self.parametrize(params, grads)
 
     def forward(self, (h_out, g_t, emb_in)):
+        print h_out.shape, g_t.shape, emb_in.shape
+
         Wy = self.params['Wy']
         Wh = self.params['Wh']
         w = self.params['w']
@@ -47,6 +49,9 @@ class Attention(ParametrizedBlock):
         query = (emb_in * alphaT).sum(axis=0)
 
         aux = Vars(
+            h_out=h_out,
+            g_t=g_t,
+            emb_in=emb_in,
             Wy_dot_h_out=Wy_apply,
             Wh_dot_g_t=Wh_apply,
             Wh_aux=Wh_aux,
@@ -62,7 +67,10 @@ class Attention(ParametrizedBlock):
 
         return ((query, ), aux)
 
-    def backward(self, (h_out, g_t, emb_in, ), aux, (dquery, )):
+    def backward(self, aux, (dquery, )):
+        h_out = aux['h_out']
+        g_t = aux['g_t']
+        emb_in = aux['emb_in']
         alpha = aux['alpha']
         alpha_aux = aux['alpha_aux']
         MwT = aux['MwT']
@@ -79,17 +87,20 @@ class Attention(ParametrizedBlock):
         dalphaT = np.dot(dquery, emb_in.T)
         demb_in = np.outer(dquery, alpha).T
 
-        (dalpha, ) = Softmax.backward((MwT, ), alpha_aux, (dalphaT.T, ))
+        dalpha = dalphaT.T
 
-        dMwT = dalpha.T
+        (dMwT, ) = Softmax.backward(alpha_aux, (dalpha, ))
 
-        (dM, dw) = Dot.backward((M, w), Mw_aux, (dMwT, ))
+        dMw = dMwT.T
 
-        (dMx, ) = Tanh.backward((Mx, ), M_aux, (dM, ))
+        print 'xxx', Mw_aux['A'].shape, Mw_aux['B'].shape
 
-        dWh_dot_g_t_rep = dMx.sum(axis=0)
+        (dM, dw) = Dot.backward(Mw_aux, (dMw, ))
+        (dMx, ) = Tanh.backward(M_aux, (dM, ))
 
-        (dh_out, dWy) = Dot.backward((h_out, Wy), Wy_aux, (dMx, ))
-        (dg_t, dWh) = Dot.backward((g_t, Wh), Wh_aux, (dWh_dot_g_t_rep, ))
+        dWh_dot_g_t_rep = dMx.sum(axis=0, keepdims=True)
 
-        return (dh_out, dg_t, demb_in)
+        (dh_out, dWy) = Dot.backward(Wy_aux, (dMx, ))
+        (dg_t, dWh) = Dot.backward(Wh_aux, (dWh_dot_g_t_rep, ))
+
+        return (dh_out, dg_t.squeeze(), demb_in)
