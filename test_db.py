@@ -3,16 +3,31 @@ import numpy as np
 
 from db import DB
 from nn.utils import check_finite_differences
+from data_calc import DataCalc
 
 class TestDB(TestCase):
     def test_forward(self):
-        db = DB()
+        content = [
+            ('chinese', 'chong'),
+            ('indian', 'taj'),
+            ('czech', 'hospoda'),
+            ('english', 'tavern'),
+        ]
+        db = DB(content, ['chinese', 'chong', 'indian', 'taj', 'czech', 'hospoda', 'english', 'tavern'])
         #db.backward(np.array([0.7, 0.1, 0.1, 0.1]), np.array([1.0, 1.0, 1.0, 1.0]))
-        czech = db.get_vector('czech')
 
-        ((db_y, ), aux) = db.forward((czech, ))
+        self.assertEqual(db.vocab.rev(db.forward((db.get_vector('czech'), ))[0][0].argmax()), 'hospoda')
+        self.assertEqual(db.vocab.rev(db.forward((db.get_vector('chinese'), ))[0][0].argmax()), 'chong')
+        self.assertEqual(db.vocab.rev(db.forward((db.get_vector('indian'), ))[0][0].argmax()), 'taj')
 
-        (dczech, ) = db.backward((czech, ), aux, (np.random.randn(*db_y.shape), ))
+        #(dczech, ) = db.backward((czech, ), aux, (np.random.randn(*db_y.shape), ))
+
+    def test_forward_calc(self):
+        data = DataCalc(max_num=3)
+        db = DB(data.get_db(), data.get_vocab())
+
+        #self.assertEqual(db.vocab.rev(db.forward((db.get_vector('1+0'), ))[0][0].argmax()), '1')
+        self.assertEqual(db.vocab.rev(db.forward((db.get_vector('0+0'), ))[0][0].argmax()), '0')
 
 
     def test_backward(self):

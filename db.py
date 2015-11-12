@@ -16,22 +16,21 @@ tavern is not bad
 """
 
 class DB(Block):
-    content = [
-        ('chinese', 'chong'),
-        ('indian', 'taj'),
-        ('czech', 'hospoda'),
-        ('english', 'tavern'),
-    ]
+    # content = [
+    #     ('chinese', 'chong'),
+    #     ('indian', 'taj'),
+    #     ('czech', 'hospoda'),
+    #     ('english', 'tavern'),
+    # ]
 
-    def __init__(self):
+    def __init__(self, content, vocab):
+        self.content = content
+
         self.vocab = Vocab()
         self.vocab.add('#OOV')
-        for word in VOCAB.split():
-            self.vocab.add(word)
 
-        for food, restaurant in self.content:
-            self.vocab.add(food)
-            self.vocab.add(restaurant)
+        for word in vocab:
+            self.vocab.add(word)
 
         entries_a = []
         for food, restaurant in self.content:
@@ -80,6 +79,8 @@ class DB(Block):
         w = np.sum(p1C, axis=0)
 
         ((result, ), result_aux) = Softmax.forward((w, ))
+
+        import ipdb; ipdb.set_trace()
 
         aux = Vars(
             x=x,
