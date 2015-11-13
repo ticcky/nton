@@ -49,6 +49,7 @@ class NTON(object):
         h0, c0 = self.input_rnn.get_init()
         ((H, C ), H_aux) = self.input_rnn.forward((E[:, np.newaxis, :], h0, c0, ))
         H = H[:, 0]
+        C = C[:, 0]
 
         # Generate answer.
         query_t_aux = []
@@ -59,7 +60,7 @@ class NTON(object):
         switch_aux = []
 
         h_t = H[-1]       # Initial state of the output RNN is equal to the input RNN.
-        c_t = C[-1, 0]
+        c_t = C[-1]
 
         # Prepare initial input symbol for generating.
         prev_y = dec_symbol
@@ -95,7 +96,9 @@ class NTON(object):
             # Decode the current word.
             #prev_y_ndx = np.random.choice(self.n_tokens, p=y_t)
             prev_y_ndx = y_t.argmax()
-            ((prev_y, ), _) = self.emb.forward(([prev_y_ndx], ))
+
+            #((prev_y, ), _) = self.emb.forward(([prev_y_ndx], ))
+            prev_y = y_t[np.newaxis, :]
 
             # Save result.
             Y.append(y_t)
@@ -116,8 +119,8 @@ class NTON(object):
 
                 )
 
-            if prev_y_ndx == self.db.vocab['[EOS]']:
-                break
+            #if prev_y_ndx == self.db.vocab['[EOS]']:
+            #    break
 
         Y = np.array(Y)
         y = np.array(y)
@@ -156,10 +159,11 @@ class NTON(object):
 
         dh_tm1 = None
         dc_tm1 = None
-        dprev_y = None
+        dy_tm1 = np.zeros_like(grads[0])
         dH = None
-        for i in range(aux['gen_n'] - 1, -1, -1):
-            (dp1, din1, din2, ) = Switch.backward(switch_aux[i], (grads[i], ))
+        dE = None
+        for i in reversed(range(aux['gen_n'])):
+            (dp1, din1, din2, ) = Switch.backward(switch_aux[i], (grads[i] + dy_tm1, ))
             (dh_t_1, ) = self.output_switch_p.backward(switch_p_aux[i], (dp1, ))
             (dh_t_2, ) = self.output_rnn_clf.backward(rnn_result_aux[i], (din1, ))
 
@@ -169,16 +173,24 @@ class NTON(object):
 
             if dc_tm1 == None:
                 dc_tm1 = np.zeros_like(dh_t)
-            (dprev_y, dc_tm1, dh_tm1_1, ) = self.output_rnn.backward(h_t_aux[i], (dh_t, dc_tm1, ))
+
+            dc_t = dc_tm1
+            (dx_t, dh_tm1_1, dc_tm1, ) = self.output_rnn.backward(h_t_aux[i], (dh_t, dc_t, ))
+            dy_tm1 = dx_t.squeeze()
 
             (dquery_t, ) = self.db.backward(db_result_t_aux[i], (din2, ))
 
-            (dH_t, dh_tm1_2, dE, ) = self.att.backward(query_t_aux[i], (dquery_t, ))
+            (dH_t, dh_tm1_2, dE_t, ) = self.att.backward(query_t_aux[i], (dquery_t, ))
 
             if dH is None:
                 dH = dH_t.copy()
             else:
                 dH += dH_t
+
+            if dE is None:
+                dE = dE_t.copy()
+            else:
+                dE += dE_t
 
             dh_tm1 = (dh_tm1_1 + dh_tm1_2).squeeze()
 
@@ -187,9 +199,11 @@ class NTON(object):
         dH[-1] += dh_tm1  # Output RNN back to Input RNN last state.
         dH = dH[:, np.newaxis, :]
         dC = dC[:, np.newaxis, :]
-        (dE, dh0, dc0) = self.input_rnn.backward(H_aux, (dH, dC))
+        (dE_2, dh0, dc0) = self.input_rnn.backward(H_aux, (dH, dC))
 
-        return (dE[:, 0], dprev_y)
+        dE += dE_2[:, 0, :]
+
+        return (dE, dy_tm1)
 
     def zero_grads(self):
         for layer in self.param_layers:
@@ -247,7 +261,7 @@ def main(**kwargs):
         **kwargs
     )
 
-    eval_nton(nton, emb, db, 'prep_test', data_test, 100)
+    eval_nton(nton, emb, db, 'prep_test', data_test, 1)
 
     # data_train = [
     #     ("i would like chinese food", "ok chong is good"),
@@ -270,7 +284,7 @@ def main(**kwargs):
         ((loss, ), loss_aux) = SeqLoss.forward((Y, x_a, ))
         (dY, ) = SeqLoss.backward(loss_aux, 1.0)
 
-        nton.backward(aux, dY)
+        nton.backward(aux, (dY, None ))
         nton.update_params(lr=0.1)
 
         avg_loss.append(loss)
@@ -301,7 +315,7 @@ def main(**kwargs):
         )
         print
 
-        if epoch % eval_step == 0:
+        if epoch % eval_step == 0 and epoch > 0:
             eval_nton(nton, emb, db, 'train', data_train, 200)
             eval_nton(nton, emb, db, 'test', data_test, 200)
 
@@ -315,7 +329,11 @@ def eval_nton(nton, emb, db, data_label, data, n_examples):
         ((x_q_emb, ), _) = emb.forward((x_q, ))
         ((symbol_dec, ), _) = emb.forward(([db.vocab['[EOS]']], ))
         print "Q:", " ".join([db.vocab.rev(x) for x in x_q])
+        print "A:", " ".join([db.vocab.rev(x) for x in x_a])
         ((Y, y), aux) = nton.forward((x_q_emb, symbol_dec))
+
+        if 0 in y:
+            y = y[:np.where(y == 0)[0][0]]
 
         wers.append(metrics.calculate_wer(x_a, y))
         acc.append(metrics.accuracy(x_a, y))
@@ -333,7 +351,7 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--n_cells', type=int, default=16)
+    parser.add_argument('--n_cells', type=int, default=50)
     parser.add_argument('--eval_step', type=int, default=1000)
     #parser.add_argument('--n_words', type=int, default=100)
     #parser.add_argument('--n_db', type=int, default=10)

@@ -3,7 +3,7 @@ import random
 
 
 class DataCalc(object):
-    def __init__(self, n_words=100, max_num=10, n_answer_tpls=3):
+    def __init__(self, n_words=100, max_num=10, n_answer_tpls=3, n_simple_qa_pairs=7):
         self.vocab = ["w%.3d" % i for i in range(n_words)]
         self.max_num = max_num
 
@@ -32,6 +32,21 @@ class DataCalc(object):
 
         self.a_tpls = a_tpls
 
+        self.simple_qa_pairs = []
+        for i in range(n_simple_qa_pairs):
+            gen_n_words = np.random.poisson(3) + 1
+            q = self._gen_seq(gen_n_words)
+            gen_n_words = np.random.poisson(3) + 1
+            a = self._gen_seq(gen_n_words)
+            a.append('[EOS]')
+
+            self.simple_qa_pairs.append((q, a))
+
+
+
+
+
+
     def get_vocab(self):
         return self.vocab
 
@@ -41,45 +56,49 @@ class DataCalc(object):
 
     def gen_data(self, test_data=False, simple_answer=False, simple_question=False):
         while True:
-            a = np.random.randint(1, self.max_num)
-            b = np.random.randint(a)
+            if np.random.random() < 0.7:
+                yield random.choice(self.simple_qa_pairs)
+            else:
+                a = np.random.randint(1, self.max_num)
+                b = np.random.randint(a)
 
-            if test_data:
-                tmp = a
-                a = b
-                b = tmp
+                if test_data:
+                    tmp = a
+                    a = b
+                    b = tmp
 
-            n_words = np.random.poisson(3) + 1
-            seq_q = self._gen_seq(n_words)
+                n_words = np.random.poisson(3) + 1
+                seq_q = self._gen_seq(n_words)
 
-            if a + b < 10:
-                tpl_ndx = 0
-            elif a + b < 15:
+                # if a + b < 10:
+                #     tpl_ndx = 0
+                # elif a + b < 15:
+                #     tpl_ndx = 1
+                # else:
+                #     tpl_ndx = 2
                 tpl_ndx = 1
-            else:
-                tpl_ndx = 2
 
-            a_tpl, a_tpl_pos = self.a_tpls[tpl_ndx]
-            seq_a = list(a_tpl) + ['[EOS]']
+                a_tpl, a_tpl_pos = self.a_tpls[tpl_ndx]
+                seq_a = list(a_tpl) + ['[EOS]']
 
 
-            q = "%d+%d" % (a, b, )
-            seq_q.insert(np.random.randint(len(seq_q)), q)
+                q = "%d+%d" % (a, b, )
+                seq_q.insert(np.random.randint(len(seq_q)), q)
 
-            a = "%d" % (a + b, )
-            seq_a.insert(a_tpl_pos, a)
+                a = "%d" % (a + b, )
+                seq_a.insert(a_tpl_pos, a)
 
-            if simple_answer:
-                res_a = [a]
-            else:
-                res_a = seq_a
+                if simple_answer:
+                    res_a = [a]
+                else:
+                    res_a = seq_a
 
-            if simple_question:
-                res_q = [q]
-            else:
-                res_q = seq_q
+                if simple_question:
+                    res_q = [q]
+                else:
+                    res_q = seq_q
 
-            yield (res_q, res_a)
+                yield (res_q, res_a)
 
     def _gen_seq(self, n_words):
         seq = []

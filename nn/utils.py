@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def check_finite_differences(fwd_fn, bwd_fn, delta=1e-5, n_times=10, gen_input_fn=None, test_inputs=(0, ), aux_only=False):
+def check_finite_differences(fwd_fn, bwd_fn, delta=1e-5, n_times=10, gen_input_fn=None, test_inputs=(0, ), test_outputs=None, aux_only=False):
     """Check that the analytical gradient `bwd_fn` matches the true gradient.
     It is verified using the finite differences method on fwd_fn..
     :param fwd_fn:
@@ -14,11 +14,23 @@ def check_finite_differences(fwd_fn, bwd_fn, delta=1e-5, n_times=10, gen_input_f
     """
     assert gen_input_fn != None
 
+    def compute_output(ys, out_weights):
+        res = 0.0
+        for i in range(len(ys)):
+            res += (ys[i] * out_weights[i]).sum()
+
+        return res
+
+
     for n in range(n_times):
         rand_input = gen_input_fn()
 
         ys, out_aux = fwd_fn(rand_input)
         out_weights = tuple(np.random.randn(*y.shape) for y in ys)
+        if test_outputs is not None:
+            for i, ow in enumerate(out_weights):
+                if not i in test_outputs:
+                    ow[:] = 0
 
         if aux_only:
             grads = bwd_fn(out_aux, out_weights)
@@ -47,6 +59,10 @@ def check_finite_differences(fwd_fn, bwd_fn, delta=1e-5, n_times=10, gen_input_f
 
                 if abs(grad_num) < 1e-7 and abs(grad_an) < 1e-7:
                     print 'inp', i, 'dim', dim, 'GRADIENT WARNING: gradients too small (num: %.10f, an: %.10f)' % (grad_num, grad_an, )
+                elif np.sign(grad_num) != np.sign(grad_an):
+                    print 'GRADIENT WARNING - incorrect signs', 'inp', i, 'dim', dim, 'val', x
+                    print 'analytic', grad_an, 'num', grad_num
+                    return False
                 else:
                     rel_error = abs(grad_an - grad_num) / abs(grad_an + grad_num)
                     if rel_error > 1e-2:
@@ -56,6 +72,7 @@ def check_finite_differences(fwd_fn, bwd_fn, delta=1e-5, n_times=10, gen_input_f
                         if rel_error > 1:
                             print 'GRADIENT ERROR TOO LARGE!'
                             return False
+
 
     return True
 
