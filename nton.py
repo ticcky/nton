@@ -8,6 +8,7 @@ from nn.switch import Switch
 from db import DB
 from seq_loss import SeqLoss
 from data_calc import DataCalc
+import metrics
 
 
 class NTON(object):
@@ -44,7 +45,7 @@ class NTON(object):
         self.print_widths = defaultdict(dict)
 
 
-    def forward(self, id_words_in, gen_n):
+    def forward(self, id_words_in, gen_n, no_print=False):
         h0, c0 = self.input_rnn.get_init()
 
         ((E, ), E_aux) = self.emb.forward((id_words_in, ))
@@ -112,15 +113,16 @@ class NTON(object):
             db_argmax = np.argmax(db_result_t)
             rnn_argmax = np.argmax(rnn_result_t)
 
-            self.print_step('gen',
-                '  ',
-                'gen: %s' % self.db.vocab.rev(prev_y_ndx),
-                'att: %s' % query_t_aux_curr['alpha'],
-                'sw: %.2f' % p1,
-                'rnn: %s (%.2f)' % (self.db.vocab.rev(rnn_argmax), rnn_result_t[rnn_argmax]),
-                'db: %s (%.2f)' % (self.db.vocab.rev(db_argmax), db_result_t[db_argmax]),
+            if not no_print:
+                self.print_step('gen',
+                    '  ',
+                    'gen: %s' % self.db.vocab.rev(prev_y_ndx),
+                    'att: %s' % query_t_aux_curr['alpha'],
+                    'sw: %.2f' % p1,
+                    'rnn: %s (%.2f)' % (self.db.vocab.rev(rnn_argmax), rnn_result_t[rnn_argmax]),
+                    'db: %s (%.2f)' % (self.db.vocab.rev(db_argmax), db_result_t[db_argmax]),
 
-            )
+                )
 
             #print self.db.vocab.rev(prev_y_ndx)
 
@@ -230,12 +232,13 @@ class NTON(object):
 
 
 def main(**kwargs):
+    eval_step = kwargs.pop('eval_step')
     np.set_printoptions(edgeitems=3,infstr='inf',
                         linewidth=200, nanstr='nan', precision=4,
                         suppress=False, threshold=1000, formatter={'float': lambda x: "%.1f" % x})
     calc = DataCalc()
     data_train = calc.gen_data(test_data=False)
-    data_test = calc.gen_data(test_data=True, simple_answer=True)
+    data_test = calc.gen_data(test_data=True)
 
     db = DB(calc.get_db(), calc.get_vocab())
     db.vocab.freeze()
@@ -250,6 +253,8 @@ def main(**kwargs):
         db=db,
         **kwargs
     )
+
+    eval_nton(nton, data_test, 100)
 
     # data_train = [
     #     ("i would like chinese food", "ok chong is good"),
@@ -298,6 +303,25 @@ def main(**kwargs):
                         "%s" % ("*" if x_a_str == x_a_hat_str else "")
         )
 
+        if epoch % eval_step == 0:
+            eval_nton(nton, 'train', data_train, 500)
+            eval_nton(nton, 'test', data_test, 500)
+
+
+def eval_nton(nton, data_label, data, n_examples):
+    wers = []
+    acc = []
+    for i in xrange(n_examples):
+        x_q, x_a = nton.prepare_data_signle(next(data))
+        ((Y, y), aux) = nton.forward(x_q, len(x_a), no_print=True)
+        wers.append(metrics.calculate_wer(x_a, y))
+        acc.append(metrics.accuracy(x_a, y))
+
+    print '### Evaluation(%s): ' % data_label,
+    print '  %15.15s %.2f' % ("WER:", np.mean(wers)),
+    print '  %15.15s %.2f' % ("Accuracy:", np.mean(acc)),
+    print
+
 
 
 if __name__ == '__main__':
@@ -307,9 +331,21 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--n_cells', type=int, default=16)
+    parser.add_argument('--eval_step', type=int, default=1000)
     #parser.add_argument('--n_words', type=int, default=100)
     #parser.add_argument('--n_db', type=int, default=10)
 
     args = parser.parse_args()
 
     main(**vars(args))
+
+
+# TODO:
+#  - Saving and loading parameters.
+#  - Making the task more difficult
+#    - more db lookups needed per query
+#    - larger db
+#  - Adding Adam learning rule.
+#  - Evaluation
+#    - BLEU, WER, PER.
+#  - Add gradient checks for NTON.
