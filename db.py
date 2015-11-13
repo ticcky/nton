@@ -48,6 +48,9 @@ class DB(Block):
 
         self.entries_c = np.array(entries_c)
 
+        self.forward = self.forward_nosoft
+        self.backward = self.backward_nosoft
+
     def words_to_ids(self, words):
         res = []
         for word in words:
@@ -73,6 +76,82 @@ class DB(Block):
 
     def forward(self, (x, )):
         ((Ax, ), Ax_aux) = Dot.forward((self.entries_a, x))
+
+        #((p1, ), p1_aux) = Softmax.forward((Ax.T, ))
+
+        p1C = Ax * self.entries_c
+        w = np.sum(p1C, axis=0)
+        w_aux = p1C.shape[0]
+
+        ((result, ), result_aux) = Softmax.forward((w, ))
+
+        aux = Vars(
+            x=x,
+            w=w,
+            w_aux=w_aux,
+            result_aux=result_aux,
+            Ax=Ax,
+            Ax_aux=Ax_aux
+        )
+
+        return ((result, ), aux)
+
+
+    def backward(self, aux, (dy, )):
+        x = aux['x']
+        w = aux['w']
+        w_aux = aux['w_aux']
+        result_aux = aux['result_aux']
+        Ax = aux['Ax']
+        Ax_aux = aux['Ax_aux']
+
+        (dw, ) = Softmax.backward(result_aux, (dy, ))
+
+        dp1C = np.tile(dw[np.newaxis, :], (w_aux, 1))
+
+        dAx = (self.entries_c * dp1C).sum(axis=1, keepdims=True)
+
+        (dA, dx) = Dot.backward(Ax_aux, (dAx, ))
+
+        return (dx[:, 0], )
+
+    def forward_nosoft(self, (x, )):
+        ((Ax, ), Ax_aux) = Dot.forward((self.entries_a, x))
+
+        #((p1, ), p1_aux) = Softmax.forward((Ax.T, ))
+
+        p1C = Ax * self.entries_c
+        w = np.sum(p1C, axis=0)
+        w_aux = p1C.shape[0]
+
+        #((result, ), result_aux) = Softmax.forward((w, ))
+
+        aux = Vars(
+            x=x,
+            w=w,
+            w_aux=w_aux,
+            Ax=Ax,
+            Ax_aux=Ax_aux
+        )
+
+        return ((w, ), aux)
+
+    def backward_nosoft(self, aux, (dy, )):
+        w_aux = aux['w_aux']
+        Ax_aux = aux['Ax_aux']
+
+        dw = dy
+
+        dp1C = np.tile(dw[np.newaxis, :], (w_aux, 1))
+
+        dAx = (self.entries_c * dp1C).sum(axis=1, keepdims=True)
+
+        (dA, dx) = Dot.backward(Ax_aux, (dAx, ))
+
+        return (dx[:, 0], )
+
+    def forward_old(self, (x, )):
+        ((Ax, ), Ax_aux) = Dot.forward((self.entries_a, x))
         ((p1, ), p1_aux) = Softmax.forward((Ax.T, ))
 
         p1C = p1.T * self.entries_c
@@ -80,7 +159,6 @@ class DB(Block):
 
         ((result, ), result_aux) = Softmax.forward((w, ))
 
-        import ipdb; ipdb.set_trace()
 
         aux = Vars(
             x=x,
@@ -93,7 +171,8 @@ class DB(Block):
 
         return ((result, ), aux)
 
-    def backward(self, aux, (dy, )):
+
+    def backward_old(self, aux, (dy, )):
         x = aux['x']
         w = aux['w']
         result_aux = aux['result_aux']

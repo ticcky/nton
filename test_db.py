@@ -6,14 +6,17 @@ from nn.utils import check_finite_differences
 from data_calc import DataCalc
 
 class TestDB(TestCase):
+    content = [
+        ('chinese', 'chong'),
+        ('indian', 'taj'),
+        ('czech', 'hospoda'),
+        ('english', 'tavern'),
+    ]
+    vocab = ['chinese', 'chong', 'indian', 'taj', 'czech', 'hospoda', 'english', 'tavern']
+
     def test_forward(self):
-        content = [
-            ('chinese', 'chong'),
-            ('indian', 'taj'),
-            ('czech', 'hospoda'),
-            ('english', 'tavern'),
-        ]
-        db = DB(content, ['chinese', 'chong', 'indian', 'taj', 'czech', 'hospoda', 'english', 'tavern'])
+
+        db = DB(self.content, self.vocab)
         #db.backward(np.array([0.7, 0.1, 0.1, 0.1]), np.array([1.0, 1.0, 1.0, 1.0]))
 
         self.assertEqual(db.vocab.rev(db.forward((db.get_vector('czech'), ))[0][0].argmax()), 'hospoda')
@@ -23,15 +26,19 @@ class TestDB(TestCase):
         #(dczech, ) = db.backward((czech, ), aux, (np.random.randn(*db_y.shape), ))
 
     def test_forward_calc(self):
-        data = DataCalc(max_num=3)
+        data = DataCalc(max_num=10)
         db = DB(data.get_db(), data.get_vocab())
 
-        #self.assertEqual(db.vocab.rev(db.forward((db.get_vector('1+0'), ))[0][0].argmax()), '1')
+        self.assertEqual(db.vocab.rev(db.forward((db.get_vector('1+0'), ))[0][0].argmax()), '1')
         self.assertEqual(db.vocab.rev(db.forward((db.get_vector('0+0'), ))[0][0].argmax()), '0')
+        self.assertEqual(db.vocab.rev(db.forward((db.get_vector('5+3'), ))[0][0].argmax()), '8')
+        self.assertEqual(db.vocab.rev(db.forward((db.get_vector('1+6'), ))[0][0].argmax()), '7')
+        self.assertEqual(db.vocab.rev(db.forward((db.get_vector('3+3'), ))[0][0].argmax()), '6')
+        self.assertEqual(db.vocab.rev(db.forward((db.get_vector('4+0'), ))[0][0].argmax()), '4')
 
 
     def test_backward(self):
-        db = DB()
+        db = DB(self.content, self.vocab)
 
         def gen_input():
             food = np.random.choice(['chinese', 'czech', 'english', 'indian'])
@@ -40,9 +47,10 @@ class TestDB(TestCase):
             return (x, )
 
         check = check_finite_differences(
-            db.forward,
-            db.backward,
-            gen_input_fn=gen_input
+            db.forward_nosoft,
+            db.backward_nosoft,
+            gen_input_fn=gen_input,
+            aux_only=True
         )
         self.assertTrue(check)
 

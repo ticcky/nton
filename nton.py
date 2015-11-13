@@ -60,7 +60,10 @@ class NTON(object):
         switch_p_aux = []
         switch_aux = []
 
-        h_t, c_t = self.output_rnn.get_init()
+        #h_t, c_t = self.output_rnn.get_init()
+        h_t = H[-1]
+        c_t = C[-1, 0]
+
         ((prev_y, ), _) = self.emb.forward(([0], ))
 
         # print 'init prev_y', prev_y
@@ -95,17 +98,28 @@ class NTON(object):
 
             y_t = y_t.squeeze()
 
-            prev_y_ndx = np.random.choice(self.n_tokens, p=y_t)
+            #prev_y_ndx = np.random.choice(self.n_tokens, p=y_t)
+            prev_y_ndx = y_t.argmax()
             ((prev_y, ), _) = self.emb.forward(([prev_y_ndx], ))
 
             Y.append(y_t)
             y.append(prev_y_ndx)
 
-            self.print_step('gen'
+            #print self.db.vocab.rev(rnn_result_t.argmax()) #, rnn_result_t
+            #print self.db.vocab.rev(db_result_t.argmax()) #, db_result_t
+            #print self.db.vocab.rev(y_t.argmax()), self.db.vocab.rev(prev_y_ndx) #, db_result_t
+
+            db_argmax = np.argmax(db_result_t)
+            rnn_argmax = np.argmax(rnn_result_t)
+
+            self.print_step('gen',
+                '  ',
                 'gen: %s' % self.db.vocab.rev(prev_y_ndx),
-                'attention %s' % query_t_aux_curr['alpha'],
-                'query_result %s' % self.db.vocab.rev(np.argmax(db_result_t)),
-                'switch %.2f' % p1
+                'att: %s' % query_t_aux_curr['alpha'],
+                'sw: %.2f' % p1,
+                'rnn: %s (%.2f)' % (self.db.vocab.rev(rnn_argmax), rnn_result_t[rnn_argmax]),
+                'db: %s (%.2f)' % (self.db.vocab.rev(db_argmax), db_result_t[db_argmax]),
+
             )
 
             #print self.db.vocab.rev(prev_y_ndx)
@@ -135,7 +149,7 @@ class NTON(object):
                 widths[i] = len(arg)
             width = widths[i]
             if len(arg) > width:
-                widths[i] = len(arg)
+                widths[i] = width = len(arg)
             print arg + " " * (width - len(arg)), ' |',
 
         print
@@ -209,16 +223,16 @@ def main(**kwargs):
                         linewidth=200, nanstr='nan', precision=4,
                         suppress=False, threshold=1000, formatter={'float': lambda x: "%.1f" % x})
     calc = DataCalc()
-    data_train = calc.gen_data(test_data=False, simple_answer=True, simple_question=True)
+    data_train = calc.gen_data(test_data=False)
     data_test = calc.gen_data(test_data=True, simple_answer=True)
 
     db = DB(calc.get_db(), calc.get_vocab())
     db.vocab.freeze()
 
-    q = db.get_vector('1+3')
-    a = db.vocab.rev(db.forward((q, ))[0][0].argmax())
-    print a
-    import ipdb; ipdb.set_trace()
+    #q = db.get_vector('1+3')
+    #a = db.vocab.rev(db.forward((q, ))[0][0].argmax())
+    #print a
+
 
     nton = NTON(
         n_tokens=len(db.vocab),
@@ -234,7 +248,7 @@ def main(**kwargs):
     # ]
 
     avg_loss = deque(maxlen=20)
-    for epoch in range(10000):
+    for epoch in xrange(10000000):
         x_q, x_a = nton.prepare_data_signle(next(data_train))
 
         nton.zero_grads()
@@ -255,19 +269,19 @@ def main(**kwargs):
         nton.print_step('loss',
                         'loss %.4f' % np.mean(avg_loss),
                         'example %d' % epoch,
-                        #"%s" % Y[np.arange(len(x_a)), x_a],
-                        "%s" % Y[0, [
-                            db.vocab['0'],
-                            db.vocab['1'],
-                            db.vocab['2'],
-                            db.vocab['3'],
-                            db.vocab['4'],
-                            db.vocab['5'],
-                            db.vocab['6'],
-                            db.vocab['7'],
-                            db.vocab['8'],
-                            db.vocab['9']
-                        ]],
+                        "%s" % Y[np.arange(len(x_a)), x_a],
+                        #"%s" % Y[0, [
+                        #    db.vocab['0'],
+                        #    db.vocab['1'],
+                        #    db.vocab['2'],
+                        #    db.vocab['3'],
+                        #    db.vocab['4'],
+                        #    db.vocab['5'],
+                        #    db.vocab['6'],
+                        #    db.vocab['7'],
+                        #    db.vocab['8'],
+                        #    db.vocab['9']
+                        #]],
                         " ".join([db.vocab.rev(x) for x in x_q]), '->', x_a_hat_str,
                         "(%s)" % x_a_str,
                         "%s" % ("*" if x_a_str == x_a_hat_str else "")

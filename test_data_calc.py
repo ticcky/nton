@@ -9,13 +9,19 @@ class TestDataCalc(unittest.TestCase):
         train_data = d.gen_data()
         test_data = d.gen_data(test_data=True)
 
-        print 'train data'
+        print '### train data'
         for i in range(10):
-            print next(train_data)
+            q, a = next(train_data)
+            print "Q:", " ".join(q)
+            print "A:", " ".join(a)
+            print
 
-        print 'test data'
+        print '### test data'
         for i in range(10):
-            print next(test_data)
+            q, a = next(test_data)
+            print "Q:", " ".join(q)
+            print "A:", " ".join(a)
+            print
 
 
 
