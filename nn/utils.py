@@ -33,11 +33,12 @@ def check_finite_differences(fwd_fn, bwd_fn, delta=1e-5, n_times=10, gen_input_f
 
                 rand_input[i].flat[dim] = orig + delta
                 (ys, _) = fwd_fn(rand_input)
-                out1 = np.array([ys[ii] * out_weights[ii] for ii in range(len(ys))]).sum()
+
+                out1 = np.array([(ys[ii] * out_weights[ii]).sum() for ii in range(len(ys))]).sum()
 
                 rand_input[i].flat[dim] = orig - delta
                 (ys, _) = fwd_fn(rand_input)
-                out2 = np.array([ys[ii] * out_weights[ii] for ii in range(len(ys))]).sum()
+                out2 = np.array([(ys[ii] * out_weights[ii]).sum() for ii in range(len(ys))]).sum()
 
                 rand_input[i].flat[dim] = orig
 

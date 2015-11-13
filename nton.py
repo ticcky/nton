@@ -12,16 +12,15 @@ import metrics
 
 
 class NTON(object):
-    def __init__(self, n_tokens, n_cells, db):
+    def __init__(self, n_tokens, n_cells, db, emb, max_gen=10):
         self.n_tokens = n_tokens
         self.n_cells = n_cells
+        self.max_gen = max_gen
 
         self.db = db
+        self.emb = emb
 
-
-        self.emb = OneHot(n_tokens=n_tokens)
-        emb_dim = len(self.db.vocab)
-
+        emb_dim = emb.size()
         self.input_rnn = LSTM(n_in=emb_dim, n_out=n_cells)
         self.output_rnn = LSTM(n_in=emb_dim, n_out=n_cells)
         self.output_rnn_clf = Sequential([
@@ -45,15 +44,13 @@ class NTON(object):
         self.print_widths = defaultdict(dict)
 
 
-    def forward(self, id_words_in, gen_n, no_print=False):
+    def forward(self, (E, dec_symbol), no_print=False):
+        # Process input sequence.
         h0, c0 = self.input_rnn.get_init()
-
-        ((E, ), E_aux) = self.emb.forward((id_words_in, ))
         ((H, C ), H_aux) = self.input_rnn.forward((E[:, np.newaxis, :], h0, c0, ))
-
         H = H[:, 0]
 
-        # Generation.
+        # Generate answer.
         query_t_aux = []
         db_result_t_aux = []
         h_t_aux = []
@@ -61,35 +58,33 @@ class NTON(object):
         switch_p_aux = []
         switch_aux = []
 
-        #h_t, c_t = self.output_rnn.get_init()
-        h_t = H[-1]
+        h_t = H[-1]       # Initial state of the output RNN is equal to the input RNN.
         c_t = C[-1, 0]
 
-        ((prev_y, ), _) = self.emb.forward(([0], ))
-
-        # print 'init prev_y', prev_y
-        # print 'init h_t', h_t
-        # print 'init c_t', c_t
+        # Prepare initial input symbol for generating.
+        prev_y = dec_symbol
 
         Y = []
         y = []
-        #print '---'
-        for i in range(gen_n):
+        for i in range(self.max_gen):   # Generate maximum `max_gen` words.
+            # Get the answer from database.
             ((query_t, ), query_t_aux_curr) = self.att.forward((H, h_t, E, ))
-
             ((db_result_t, ), db_result_t_aux_curr) = self.db.forward((query_t, ))
 
-
-
-
+            # Get the answer from RNN.
             ((h_t, c_t), h_t_aux_curr) = self.output_rnn.forward((prev_y[:, np.newaxis, :], c_t, h_t))
             h_t = h_t[0][0]
             c_t = c_t[0][0]
-
             ((rnn_result_t, ), rnn_result_aux_curr) = self.output_rnn_clf.forward((h_t, ))
-            ((p1, ), switch_p_aux_curr) = self.output_switch_p.forward((h_t, ))
-            ((y_t, ), switch_aux_curr) = Switch.forward((p1, rnn_result_t, db_result_t))
 
+            # Get the value of switch between RNN and database.
+            ((p1, ), switch_p_aux_curr) = self.output_switch_p.forward((h_t, ))
+
+            # Get switched output.
+            ((y_t, ), switch_aux_curr) = Switch.forward((p1, rnn_result_t, db_result_t))
+            y_t = y_t.squeeze()
+
+            # Save auxiliary variables for backward computation.
             query_t_aux.append(query_t_aux_curr)
             db_result_t_aux.append(db_result_t_aux_curr)
             h_t_aux.append(h_t_aux_curr)
@@ -97,19 +92,16 @@ class NTON(object):
             switch_p_aux.append(switch_p_aux_curr)
             switch_aux.append(switch_aux_curr)
 
-            y_t = y_t.squeeze()
-
+            # Decode the current word.
             #prev_y_ndx = np.random.choice(self.n_tokens, p=y_t)
             prev_y_ndx = y_t.argmax()
             ((prev_y, ), _) = self.emb.forward(([prev_y_ndx], ))
 
+            # Save result.
             Y.append(y_t)
             y.append(prev_y_ndx)
 
-            #print self.db.vocab.rev(rnn_result_t.argmax()) #, rnn_result_t
-            #print self.db.vocab.rev(db_result_t.argmax()) #, db_result_t
-            #print self.db.vocab.rev(y_t.argmax()), self.db.vocab.rev(prev_y_ndx) #, db_result_t
-
+            # Debug print something.
             db_argmax = np.argmax(db_result_t)
             rnn_argmax = np.argmax(rnn_result_t)
 
@@ -124,24 +116,21 @@ class NTON(object):
 
                 )
 
-            #print self.db.vocab.rev(prev_y_ndx)
-
-            #print 'next prev_y', prev_y_ndx, prev_y
-            #print 'next h_t', h_t
+            if prev_y_ndx == self.db.vocab['[EOS]']:
+                break
 
         Y = np.array(Y)
         y = np.array(y)
 
         return ((Y, y), Vars(
-            E_aux=E_aux,
             H_aux=H_aux,
+            gen_n=len(y),
             query_t_aux=query_t_aux,
             db_result_t_aux=db_result_t_aux,
             h_t_aux=h_t_aux,
             rnn_result_aux=rnn_result_aux,
             switch_p_aux=switch_p_aux,
-            switch_aux=switch_aux,
-            gen_n=gen_n
+            switch_aux=switch_aux
         ))
 
     def print_step(self, t, *args):
@@ -156,7 +145,7 @@ class NTON(object):
 
         print
 
-    def backward(self, aux, grads):
+    def backward(self, aux, (grads, _)):
         H_aux = aux['H_aux']
         rnn_result_aux = aux['rnn_result_aux']
         switch_p_aux = aux['switch_p_aux']
@@ -167,6 +156,7 @@ class NTON(object):
 
         dh_tm1 = None
         dc_tm1 = None
+        dprev_y = None
         dH = None
         for i in range(aux['gen_n'] - 1, -1, -1):
             (dp1, din1, din2, ) = Switch.backward(switch_aux[i], (grads[i], ))
@@ -198,6 +188,8 @@ class NTON(object):
         dH = dH[:, np.newaxis, :]
         dC = dC[:, np.newaxis, :]
         (dE, dh0, dc0) = self.input_rnn.backward(H_aux, (dH, dC))
+
+        return (dE[:, 0], dprev_y)
 
     def zero_grads(self):
         for layer in self.param_layers:
@@ -246,15 +238,16 @@ def main(**kwargs):
     #q = db.get_vector('1+3')
     #a = db.vocab.rev(db.forward((q, ))[0][0].argmax())
     #print a
-
+    emb = OneHot(n_tokens=len(db.vocab))
 
     nton = NTON(
         n_tokens=len(db.vocab),
         db=db,
+        emb=emb,
         **kwargs
     )
 
-    eval_nton(nton, data_test, 100)
+    eval_nton(nton, emb, db, 'prep_test', data_test, 100)
 
     # data_train = [
     #     ("i would like chinese food", "ok chong is good"),
@@ -269,7 +262,11 @@ def main(**kwargs):
 
         nton.zero_grads()
 
-        ((Y, y), aux) = nton.forward(x_q, len(x_a))
+        # Prepare input.
+        ((x_q_emb, ), _) = emb.forward((x_q, ))
+        ((symbol_dec, ), _) = emb.forward(([db.vocab['[EOS]']], ))
+
+        ((Y, y), aux) = nton.forward((x_q_emb, symbol_dec))
         ((loss, ), loss_aux) = SeqLoss.forward((Y, x_a, ))
         (dY, ) = SeqLoss.backward(loss_aux, 1.0)
 
@@ -285,7 +282,7 @@ def main(**kwargs):
         nton.print_step('loss',
                         'loss %.4f' % np.mean(avg_loss),
                         'example %d' % epoch,
-                        "%s" % Y[np.arange(len(x_a)), x_a],
+                        "%s" % Y[np.arange(min(len(x_a), len(Y))), x_a[:min(len(x_a), len(Y))]],
                         #"%s" % Y[0, [
                         #    db.vocab['0'],
                         #    db.vocab['1'],
@@ -302,18 +299,24 @@ def main(**kwargs):
                         "(%s)" % x_a_str,
                         "%s" % ("*" if x_a_str == x_a_hat_str else "")
         )
+        print
 
         if epoch % eval_step == 0:
-            eval_nton(nton, 'train', data_train, 500)
-            eval_nton(nton, 'test', data_test, 500)
+            eval_nton(nton, emb, db, 'train', data_train, 200)
+            eval_nton(nton, emb, db, 'test', data_test, 200)
 
 
-def eval_nton(nton, data_label, data, n_examples):
+def eval_nton(nton, emb, db, data_label, data, n_examples):
+    print '### Evaluation(%s): ' % data_label
     wers = []
     acc = []
     for i in xrange(n_examples):
         x_q, x_a = nton.prepare_data_signle(next(data))
-        ((Y, y), aux) = nton.forward(x_q, len(x_a), no_print=True)
+        ((x_q_emb, ), _) = emb.forward((x_q, ))
+        ((symbol_dec, ), _) = emb.forward(([db.vocab['[EOS]']], ))
+        print "Q:", " ".join([db.vocab.rev(x) for x in x_q])
+        ((Y, y), aux) = nton.forward((x_q_emb, symbol_dec))
+
         wers.append(metrics.calculate_wer(x_a, y))
         acc.append(metrics.accuracy(x_a, y))
 

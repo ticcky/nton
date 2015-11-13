@@ -23,14 +23,14 @@ class DataCalc(object):
                 self.vocab.append('%d' % (i + y))
                 self.db.append(("%d+%d" % (i, y, ), "%d" % (i + y)))
 
-        q_tpls = []
+        a_tpls = []
         for i in range(n_answer_tpls):
             gen_n_words = np.random.poisson(3) + 1
             a_tpl = self._gen_seq(gen_n_words)
             a_tpl_pos = np.random.randint(len(a_tpl))
-            q_tpls.append((a_tpl, a_tpl_pos, ))
+            a_tpls.append((a_tpl, a_tpl_pos, ))
 
-        self.q_tpls = q_tpls
+        self.a_tpls = a_tpls
 
     def get_vocab(self):
         return self.vocab
@@ -59,8 +59,8 @@ class DataCalc(object):
             else:
                 tpl_ndx = 2
 
-            a_tpl, a_tpl_pos = self.q_tpls[tpl_ndx]
-            seq_a = list(a_tpl)
+            a_tpl, a_tpl_pos = self.a_tpls[tpl_ndx]
+            seq_a = list(a_tpl) + ['[EOS]']
 
 
             q = "%d+%d" % (a, b, )

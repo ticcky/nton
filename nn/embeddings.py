@@ -9,6 +9,9 @@ class OneHot(Block):
     def __init__(self, n_tokens):
         self.n_tokens = n_tokens
 
+    def size(self):
+        return self.n_tokens
+
     def forward(self, (x, )):
         res = np.zeros((len(x), self.n_tokens))
         res[range(len(x)), x] = 1
@@ -32,6 +35,9 @@ class Embeddings(ParametrizedBlock):
         grads = Vars(W=dW)
 
         self.parametrize(params, grads)
+
+    def size(self):
+        return self.n_dims
 
     def forward(self, (x, )):
         """Map input indicies to embedding vectors."""

@@ -1,6 +1,9 @@
 
 def accuracy(ref, hyp):
-    return (ref == hyp).sum() * 1.0 / len(ref)
+    if len(ref) > len(hyp):
+        hyp = hyp.copy()
+        hyp.resize(ref.shape)
+    return (ref == hyp[:len(ref)]).sum() * 1.0 / len(ref)
 
 
 def calculate_wer(reference, hypothesis):

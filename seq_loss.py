@@ -8,9 +8,7 @@ class SeqLoss(Block):
 
     @classmethod
     def forward(self, (y_hat, y_true)):
-        assert len(y_hat) >= len(y_true), 'Generated output shorter'
-
-
+        #assert len(y_hat) >= len(y_true), 'Generated output shorter'
 
         res = 0.0
         grad = np.zeros_like(y_hat)

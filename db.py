@@ -27,7 +27,7 @@ class DB(Block):
         self.content = content
 
         self.vocab = Vocab()
-        self.vocab.add('#OOV')
+        self.vocab.add('[EOS]')
 
         for word in vocab:
             self.vocab.add(word)
@@ -56,7 +56,7 @@ class DB(Block):
         for word in words:
             res.append(self.vocab.add(word))
 
-        return res
+        return np.array(res)
 
     def get_vector(self, *words):
         res = np.zeros((len(self.vocab), ))
