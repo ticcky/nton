@@ -164,6 +164,7 @@ class NTON(object):
         query_t_aux = aux['query_t_aux']
 
         dh_tm1 = None
+        dc_tm1 = None
         dH = None
         for i in range(aux['gen_n'] - 1, -1, -1):
             (dp1, din1, din2, ) = Switch.backward(switch_aux[i], (grads[i], ))
@@ -174,17 +175,27 @@ class NTON(object):
             if dh_tm1 is not None:
                 dh_t += dh_tm1
 
-            dc_t = np.zeros_like(dh_t)
-            (dprev_y, dc_tm1, dh_tm1_1, ) = self.output_rnn.backward(h_t_aux[i], (dh_t, dc_t, ))
+            if dc_tm1 == None:
+                dc_tm1 = np.zeros_like(dh_t)
+            (dprev_y, dc_tm1, dh_tm1_1, ) = self.output_rnn.backward(h_t_aux[i], (dh_t, dc_tm1, ))
 
             (dquery_t, ) = self.db.backward(db_result_t_aux[i], (din2, ))
 
-            (dH, dh_tm1_2, dE, ) = self.att.backward(query_t_aux[i], (dquery_t, ))
+            (dH_t, dh_tm1_2, dE, ) = self.att.backward(query_t_aux[i], (dquery_t, ))
+
+            if dH is None:
+                dH = dH_t.copy()
+            else:
+                dH += dH_t
 
             dh_tm1 = (dh_tm1_1 + dh_tm1_2).squeeze()
 
+        dC = np.zeros_like(dH)
+        dC[-1] += dc_tm1.squeeze()
+        dH[-1] += dh_tm1  # Output RNN back to Input RNN last state.
         dH = dH[:, np.newaxis, :]
-        (dE, dh0, dc0) = self.input_rnn.backward(H_aux, (dH, np.zeros_like(dH)))
+        dC = dC[:, np.newaxis, :]
+        (dE, dh0, dc0) = self.input_rnn.backward(H_aux, (dH, dC))
 
     def zero_grads(self):
         for layer in self.param_layers:
