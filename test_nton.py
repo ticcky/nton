@@ -30,7 +30,7 @@ class TestNTON(unittest.TestCase):
         self.assertEqual(len(y), nton.max_gen)
 
     def test_backward(self):
-        calc = DataCalc()
+        calc = DataCalc(max_num=2, n_words=5)
         db = DB(calc.get_db(), calc.get_vocab())
 
         emb = OneHot(n_tokens=len(db.vocab))

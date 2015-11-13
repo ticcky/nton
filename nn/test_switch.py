@@ -1,9 +1,9 @@
 import numpy as np
 from unittest import TestCase, main
 
-from switch import Switch
-from utils import TestParamGradInLayer, check_finite_differences
-from vars import Vars
+from nn.switch import Switch
+from nn.utils import TestParamGradInLayer, check_finite_differences
+from nn.vars import Vars
 
 
 class TestSwitch(TestCase):

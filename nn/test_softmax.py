@@ -1,8 +1,8 @@
 from unittest import TestCase, main
 import numpy as np
 
-from softmax import Softmax
-from utils import check_finite_differences
+from nn.softmax import Softmax
+from nn.utils import check_finite_differences
 
 
 class TestSoftmax(TestCase):
@@ -21,7 +21,8 @@ class TestSoftmax(TestCase):
             check_finite_differences(
                 softmax.forward,
                 softmax.backward,
-                gen_input_fn=lambda: (np.random.randn(7, 3), )
+                gen_input_fn=lambda: (np.random.randn(7, 3), ),
+                aux_only=True
             )
         )
 

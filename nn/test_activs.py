@@ -1,8 +1,8 @@
 from unittest import TestCase, main
 import numpy as np
 
-from activs import Tanh, Sigmoid
-from utils import check_finite_differences
+from nn.activs import Tanh, Sigmoid
+from nn.utils import check_finite_differences
 
 
 class TestTanh(TestCase):
@@ -18,7 +18,8 @@ class TestTanh(TestCase):
             check_finite_differences(
                 Tanh.forward,
                 Tanh.backward,
-                gen_input_fn=lambda: (np.random.randn(7, 3), )
+                gen_input_fn=lambda: (np.random.randn(7, 3), ),
+                aux_only=True
             )
         )
 
@@ -36,7 +37,8 @@ class TestSigmoid(TestCase):
             check_finite_differences(
                 Sigmoid.forward,
                 Sigmoid.backward,
-                gen_input_fn=lambda: (np.random.randn(7, 3), )
+                gen_input_fn=lambda: (np.random.randn(7, 3), ),
+                aux_only=True
             )
         )
 

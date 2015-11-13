@@ -47,17 +47,21 @@ class Embeddings(ParametrizedBlock):
 
         y = W[x]
 
-        return ((y, ), None, )
+        aux = Vars(
+            x=x
+        )
 
-    def backward(self, inputs, aux, grads):
-        self.grad_accum(inputs, aux, grads)
+        return ((y, ), aux, )
+
+    def backward(self, aux, grads):
+        self.grad_accum(aux, grads)
 
         return (None, )  # Non-differentiable.
 
-    def grad_accum(self, inputs, aux, grads):
+    def grad_accum(self, aux, grads):
         dW = self.grads['W']
 
-        x = inputs[0]
+        x = aux['x']
         dy = grads[0]
 
         for i in range(len(x)):

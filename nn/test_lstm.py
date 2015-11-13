@@ -1,9 +1,9 @@
 import numpy as np
 from unittest import TestCase, main
 
-from lstm import LSTM
-from utils import TestParamGradInLayer, check_finite_differences
-from vars import Vars
+from nn.lstm import LSTM
+from nn.utils import TestParamGradInLayer, check_finite_differences
+from nn.vars import Vars
 
 
 class TestLSTM(TestCase):
@@ -11,7 +11,7 @@ class TestLSTM(TestCase):
         lstm = LSTM(n_in=5, n_out=7)
 
         input = np.random.randn(11, 3, 5)
-        ((h, c, ), aux_lstm) = lstm.forward((input, None, None ))
+        ((h, c, ), aux_lstm) = lstm.forward((input, np.random.randn(3, 7), np.random.randn(3, 7) ))
 
         self.assertEqual(h.shape, (11, 3, 7))
 
@@ -19,8 +19,8 @@ class TestLSTM(TestCase):
         np.random.seed(9)
         def gen():
             x = np.random.randn(5, 3, 10)
-            h0 = np.random.randn(3, 4) * 0
-            c0 = np.random.randn(3, 4) * 0
+            h0 = np.random.randn(3, 4)
+            c0 = np.random.randn(3, 4)
             return (x, h0, c0, )
 
         lstm = LSTM(n_in=10, n_out=4)

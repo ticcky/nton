@@ -1,9 +1,9 @@
 import numpy as np
 from unittest import TestCase, main
 
-from embeddings import Embeddings, OneHot
-from utils import TestParamGradInLayer, check_finite_differences
-from vars import Vars
+from nn.embeddings import Embeddings, OneHot
+from nn.utils import TestParamGradInLayer, check_finite_differences
+from nn.vars import Vars
 
 
 class TestOneHot(TestCase):
@@ -32,7 +32,8 @@ class TestEmbeddings(TestCase):
         check = check_finite_differences(
             checker.forward,
             checker.backward,
-            gen_input_fn=lambda: (np.random.randn(*emb.params['W'].shape), )
+            gen_input_fn=lambda: (np.random.randn(*emb.params['W'].shape), ),
+            aux_only=True
         )
         self.assertTrue(check)
 

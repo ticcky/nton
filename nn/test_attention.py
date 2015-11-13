@@ -1,9 +1,9 @@
 import numpy as np
 from unittest import TestCase, main
 
-from attention import Attention
-from utils import TestParamGradInLayer, check_finite_differences
-from vars import Vars
+from nn.attention import Attention
+from nn.utils import TestParamGradInLayer, check_finite_differences
+from nn.vars import Vars
 
 
 class TestAttention(TestCase):

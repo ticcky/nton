@@ -1,8 +1,8 @@
 from unittest import TestCase, main
 import numpy as np
 
-from linear import LinearLayer, Dot
-from utils import check_finite_differences, TestParamGradInLayer
+from nn.linear import LinearLayer, Dot
+from nn.utils import check_finite_differences, TestParamGradInLayer
 
 
 class TestLinearLayer(TestCase):
@@ -61,39 +61,49 @@ class TestLinearTransform(TestCase):
         B = np.random.randn(4, 7)
 
         ((AB, ), aux) = Dot.forward((A, B, ))
-        (dA, dB) = Dot.backward((A, B, ), aux, (np.ones_like(AB) ,))
-
-        print 'dA', dA.shape
-        print 'dB', dB.shape
+        (dA, dB) = Dot.backward(aux, (np.ones_like(AB) ,))
 
         A = np.random.randn(3, 4)
         B = np.random.randn(4)
 
         ((AB, ), aux) = Dot.forward((A, B, ))
-        (dA, dB) = Dot.backward((A, B, ), aux, (np.ones_like(AB) ,))
+        (dA, dB) = Dot.backward(aux, (np.ones_like(AB) ,))
 
-        import ipdb; ipdb.set_trace()
-
-        self.assertTrue(np.allclose(A[:, :5] + 0.5, res))
+        #self.assertTrue(np.allclose(A[:, :5] + 0.5, res))
 
     def test_backward(self):
         """Test gradient computation for inputs and all layer's parameters."""
-        linear = Linear(n_in=10, n_out=5)
+        linear = LinearLayer(n_in=10, n_out=5)
 
-        check = check_finite_differences(linear.forward, linear.backward, gen_input_fn=lambda: np.random.randn(30, 10))
+        check = check_finite_differences(
+            linear.forward,
+            linear.backward,
+            gen_input_fn=lambda: (np.random.randn(30, 10), ),
+            aux_only=True
+        )
         self.assertTrue(check)
 
-        inp = np.random.randn(50, 30, 10)
-        checker = TestParamGradInLayer(linear, 'W', layer_x=inp)
-        check = check_finite_differences(checker.forward, checker.backward, gen_input_fn=lambda: np.random.randn(*linear.params['W'].shape))
+        inp = (np.random.randn(50, 30, 10), )
+        checker = TestParamGradInLayer(linear, 'W', layer_input=inp)
+        check = check_finite_differences(
+            checker.forward,
+            checker.backward,
+            gen_input_fn=lambda: (np.random.randn(*linear.params['W'].shape), ),
+            aux_only=True
+        )
         self.assertTrue(check)
 
-        checker = TestParamGradInLayer(linear, 'b', layer_x=inp)
-        check = check_finite_differences(checker.forward, checker.backward, gen_input_fn=lambda: np.random.randn(*linear.params['b'].shape))
+        checker = TestParamGradInLayer(linear, 'b', layer_input=inp)
+        check = check_finite_differences(
+            checker.forward,
+            checker.backward,
+            gen_input_fn=lambda: (np.random.randn(*linear.params['b'].shape), ),
+            aux_only=True
+        )
         self.assertTrue(check)
 
     def test_params(self):
-        lin = Linear(n_in=17, n_out=9)
+        lin = LinearLayer(n_in=17, n_out=9)
         self.assertIsNotNone(lin.params['W'])
         self.assertIsNotNone(lin.params['b'])
 

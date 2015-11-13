@@ -1,12 +1,12 @@
 from unittest import TestCase, main
 import numpy as np
 
-from utils import check_finite_differences
-from sequential import Sequential
-from inits import Constant, Eye
-from lstm import LSTM
-from softmax import Softmax
-from linear import LinearLayer
+from nn.utils import check_finite_differences
+from nn.sequential import Sequential
+from nn.inits import Constant, Eye
+from nn.lstm import LSTM
+from nn.softmax import Softmax
+from nn.linear import LinearLayer
 
 class TestSequential(TestCase):
     def test_forward(self):
