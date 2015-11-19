@@ -13,7 +13,9 @@ class Softmax(Block):
         ndx = ((slice(None), ) * (len(x.shape) - 1)) + (None, )
         res = res / np.sum(res, axis=len(x.shape) - 1)[ndx]
 
-        aux = Vars(y=res)
+        aux = Vars(
+            y=res
+        )
 
         return ((res, ), aux, )
 

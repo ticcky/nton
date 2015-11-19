@@ -32,10 +32,8 @@ def check_finite_differences(fwd_fn, bwd_fn, delta=1e-5, n_times=10, gen_input_f
                 if not i in test_outputs:
                     ow[:] = 0
 
-        if aux_only:
-            grads = bwd_fn(out_aux, out_weights)
-        else:
-            grads = bwd_fn(rand_input, out_aux, out_weights)
+        assert aux_only
+        grads = bwd_fn(out_aux, out_weights)
 
         for i in test_inputs:
             assert grads[i].shape == rand_input[i].shape, "shape1=%s, shape2=%s" % (grads[i].shape,  rand_input[i].shape, )
@@ -45,7 +43,6 @@ def check_finite_differences(fwd_fn, bwd_fn, delta=1e-5, n_times=10, gen_input_f
 
                 rand_input[i].flat[dim] = orig + delta
                 (ys, _) = fwd_fn(rand_input)
-
                 out1 = np.array([(ys[ii] * out_weights[ii]).sum() for ii in range(len(ys))]).sum()
 
                 rand_input[i].flat[dim] = orig - delta
@@ -59,19 +56,19 @@ def check_finite_differences(fwd_fn, bwd_fn, delta=1e-5, n_times=10, gen_input_f
 
                 if abs(grad_num) < 1e-7 and abs(grad_an) < 1e-7:
                     print 'inp', i, 'dim', dim, 'GRADIENT WARNING: gradients too small (num: %.10f, an: %.10f)' % (grad_num, grad_an, )
-                elif np.sign(grad_num) != np.sign(grad_an):
-                    print 'GRADIENT WARNING - incorrect signs', 'inp', i, 'dim', dim, 'val', x
-                    print 'analytic', grad_an, 'num', grad_num
-                    return False
                 else:
                     rel_error = abs(grad_an - grad_num) / abs(grad_an + grad_num)
                     if rel_error > 1e-2:
-                        print 'GRADIENT WARNING', 'inp', i, 'dim', dim, 'val', x
-                        print 'analytic', grad_an, 'num', grad_num
-                        print 'rel error', rel_error
+                        print 'GRADIENT WARNING', 'inp', i, 'dim', dim, 'val', x,
+                        print 'an', grad_an, 'num', grad_num,
+                        print 'rel error', rel_error,
                         if rel_error > 1:
                             print 'GRADIENT ERROR TOO LARGE!'
                             return False
+                        print
+                    else:
+                        #print 'GRADIENT OK', 'inp', i, 'dim', dim, 'x', x, 'an', grad_an, 'num', grad_num
+                        pass
 
 
     return True

@@ -18,8 +18,8 @@ class TestSwitch(TestCase):
     def test_backward(self):
         def gen_input():
             p1 = np.random.randn(1)
-            in1 = np.random.randn(13)
-            in2 = np.random.randn(13)
+            in1 = np.random.randn(100)
+            in2 = np.random.randn(100)
 
             return (p1, in1, in2, )
 

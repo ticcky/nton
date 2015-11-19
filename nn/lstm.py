@@ -24,6 +24,9 @@ class LSTM(ParametrizedBlock):
     def get_init(self):
         return (np.zeros((self.n_cells, )), np.zeros((self.n_cells, )))
 
+    def get_init_grad(self):
+        return (np.zeros((self.n_cells, )), np.zeros((self.n_cells, )))
+
     def forward(self, (x, h0, c0 )):
         """
         X should be of shape (t,b,input_size), where t = length of sequence, b = batch size

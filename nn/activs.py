@@ -25,7 +25,9 @@ class Sigmoid(Block):
     def forward(self, (x, )):
         y = 0.5 * (1 + np.tanh(0.5 * x))
 
-        aux = Vars(y=y)
+        aux = Vars(
+            y=y
+        )
 
         return ((y, ), aux)
 

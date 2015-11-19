@@ -43,6 +43,7 @@ class TestDB(TestCase):
         def gen_input():
             food = np.random.choice(['chinese', 'czech', 'english', 'indian'])
             x = db.get_vector(food)
+            x += np.random.randn(*x.shape)
 
             return (x, )
 

@@ -19,11 +19,11 @@ class TestLSTM(TestCase):
         np.random.seed(9)
         def gen():
             x = np.random.randn(5, 3, 10)
-            h0 = np.random.randn(3, 4)
-            c0 = np.random.randn(3, 4)
+            h0 = np.random.randn(3, 14)
+            c0 = np.random.randn(3, 14)
             return (x, h0, c0, )
 
-        lstm = LSTM(n_in=10, n_out=4)
+        lstm = LSTM(n_in=10, n_out=14)
 
         check = check_finite_differences(
             lstm.forward,

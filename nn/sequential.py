@@ -19,20 +19,18 @@ class Sequential(ParametrizedBlock):
         for i, layer in enumerate(layers):
             if isinstance(layer, ParametrizedBlock):
                 for param_name in layer.params:
-                    key = "%2d__%s" % (i, param_name, )
+                    key = "%.2d__%s" % (i, param_name, )
                     params[key] = layer.params[param_name]
                     grads[key] = layer.grads[param_name]
 
         self.parametrize(Vars(**params), Vars(**grads))
 
     def forward(self, (x, )):
-        ycache = []
         yaux = []
         last_y = x
         for layer in self.layers:
             ((y, ), y_aux) = layer.forward((last_y, ))
 
-            ycache.append(y)
             yaux.append(y_aux)
 
             last_y = y
