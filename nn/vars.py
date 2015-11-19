@@ -32,6 +32,15 @@ class Vars(object):
         for param_name in self.var_names:
             yield param_name
 
+    @staticmethod
+    def create_from(vars):
+        data = {}
+        for var in vars:
+            data[var] = np.zeros_like(vars[var])
+
+        return Vars(**data)
+
+
     def values(self):
         """Get a list of values of all variables in alphabetical order."""
         return [self.vars[param_name] for param_name in self.var_names]

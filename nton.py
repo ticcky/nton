@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import seaborn as sbt
 sbt.set()
 
-from nn import LSTM, OneHot, Sequential, LinearLayer, Softmax, Sigmoid, Vars, ParametrizedBlock
+from nn import LSTM, OneHot, Sequential, LinearLayer, Softmax, Sigmoid, Vars, ParametrizedBlock, VanillaSGD, Adam
 from nn.attention import Attention
 from nn.switch import Switch
 from db import DB
@@ -49,29 +49,18 @@ class NTON(ParametrizedBlock):
 
         self.print_widths = defaultdict(dict)
 
-        params = {}
-        grads = {}
-        for layer_name, layer in zip(self.param_layers_names, self.param_layers):
-            if isinstance(layer, ParametrizedBlock):
-                for param_name in layer.params:
-                    key = "%s__%s" % (layer_name, param_name, )
-                    params[key] = layer.params[param_name]
-                    grads[key] = layer.grads[param_name]
+        self.parametrize_from_layers(self.param_layers, self.param_layers_names)
 
-        self.parametrize(Vars(**params), Vars(**grads))
-
-    def forward(self, (E, dec_symbol), no_print=False):
-        # Process input sequence.
+    def forward(self, (E, eos_token), no_print=False):
         h0, c0 = self.input_rnn.get_init()
-        ((H, C ), H_aux) = self.input_rnn.forward((E[:, np.newaxis, :], h0, c0, ))
+        ((H, C ), H_aux) = self.input_rnn.forward((E[:, np.newaxis, :], h0, c0, ))   # Process input sequence.
         H = H[:, 0]
         C = C[:, 0]
 
         h_tm1 = H[-1]       # Initial state of the output RNN is equal to the input RNN.
         c_tm1 = C[-1]
 
-        # Prepare initial input symbol for generating.
-        y_tm1 = dec_symbol
+        y_tm1 = eos_token   # Prepare initial input symbol for generating.
 
         Y = []
         y = []
@@ -96,14 +85,6 @@ class NTON(ParametrizedBlock):
         ))
 
     def forward_gen_step(self, (y_tm1, h_tm1, c_tm1, H, E)):
-        # print '-'
-        # print 'in', y_tm1.shape
-        # print 'in', h_tm1.shape
-        # print 'in', c_tm1.shape
-        # print 'in', H.shape
-        # print 'in', E.shape
-
-
         ((h_t, c_t), h_t_aux_curr) = self.output_rnn.forward((y_tm1[np.newaxis, np.newaxis, :], h_tm1, c_tm1))
         h_t = h_t[0][0]
         c_t = c_t[0][0]
@@ -128,17 +109,9 @@ class NTON(ParametrizedBlock):
 
         self.forward_gen_step_debug(**locals())
 
-        # print 'out', y_t.shape
-        # print 'out', h_t.shape
-        # print 'out', c_t.shape
-
         return ((y_t, h_t, c_t), aux)
 
     def backward_gen_step(self, aux, (dy_t, dh_t, dc_t)):
-        # print 'd', dy_t.shape
-        # print 'd', dh_t.shape
-        # print 'd', dc_t.shape
-
         (dp1, drnn_result_t, ddb_result_t, ) =      Switch.backward(aux['y_t'], (dy_t , ))
         (dh_t_1, ) = self.output_switch_p.backward(aux['p1'], (dp1, ))
         (dh_t_2, ) =  self.output_rnn_clf.backward(aux['rnn_result_t'], (drnn_result_t, ))
@@ -146,12 +119,6 @@ class NTON(ParametrizedBlock):
         (dH_t, dh_t_3, dE_t, ) = self.att.backward(aux['query_t'], (dquery_t, ))
 
         (dx_t, dh_tm1, dc_tm1, ) = self.output_rnn.backward(aux['h_t'], ((dh_t + dh_t_1 + dh_t_2 + dh_t_3)[None, None, :], dc_t[None, None, :], ))
-
-        # print 'dout', dx_t[:, 0].shape
-        # print 'dout', dh_tm1[0].shape
-        # print 'dout', dc_tm1[0].shape
-        # print 'dout', dH_t.shape
-        # print 'dout', dE_t.shape
 
         return (dx_t[0, 0], dh_tm1[0], dc_tm1[0], dH_t, dE_t, )
 
@@ -170,7 +137,6 @@ class NTON(ParametrizedBlock):
             'sw: %.2f' % p1,
             'rnn: %s (%.2f)' % (self.db.vocab.rev(rnn_argmax), rnn_result_t[rnn_argmax]),
             'db: %s (%.2f)' % (self.db.vocab.rev(db_argmax), db_result_t[db_argmax]),
-
         )
 
     def print_step(self, t, *args):
@@ -181,7 +147,8 @@ class NTON(ParametrizedBlock):
             width = widths[i]
             if len(arg) > width:
                 widths[i] = width = len(arg)
-            print arg + " " * (width - len(arg)), ' |',
+            #print arg + " " * (width - len(arg)), ' |',
+            print arg, '|',
 
         print
 
@@ -206,7 +173,6 @@ class NTON(ParametrizedBlock):
             else:
                 dE += dE_t
 
-
         dH[-1] += dh_tp1.squeeze()  # Output RNN back to Input RNN last state.
         dC = np.zeros_like(dH)
         dC[-1] += dc_tp1.squeeze()
@@ -223,6 +189,11 @@ class NTON(ParametrizedBlock):
             layer.grads.zero()
 
     def update_params(self, lr):
+        self.params.increment_by(self.grads, factor=-lr)
+        # for layer in self.param_layers:
+        #     layer.params.increment_by(layer.grads, factor=-lr)
+
+    def update_params_adam(self, lr):
         for layer in self.param_layers:
             layer.params.increment_by(layer.grads, factor=-lr)
 
@@ -232,15 +203,6 @@ class NTON(ParametrizedBlock):
             res.append(self.db.vocab.rev(Y[i].argmax()))
 
         return res
-
-    # def prepare_data(self, x):
-    #     res = []
-    #     for q, a in x:
-    #         x_q = self.db.words_to_ids(q.split())
-    #         x_a = self.db.words_to_ids(a.split())
-    #         res.append((x_q, x_a))
-    #
-    #     return res
 
     def prepare_data_signle(self, (q, a)):
         x_q = self.db.words_to_ids(q)
@@ -292,6 +254,8 @@ def main(**kwargs):
         **kwargs
     )
 
+    update_rule = Adam(nton.params, nton.grads)
+
     eval_nton(nton, emb, db, 'prep_test', data_test, 1)
 
     # data_train = [
@@ -314,11 +278,12 @@ def main(**kwargs):
         symbol_dec = symbol_dec[0]
 
         ((Y, y), aux) = nton.forward((x_q_emb, symbol_dec))
-        ((loss, ), loss_aux) = SeqLoss.forward((Y, x_a, ))
+        ((loss, ), loss_aux) = SeqLoss.forward((Y, np.array(list(x_a) + [-1] * (len(y) - len(x_a))), ))
         (dY, ) = SeqLoss.backward(loss_aux, 1.0)
 
         nton.backward(aux, (dY, None ))
-        nton.update_params(lr=0.1)
+        #nton.update_params(lr=0.1)
+        update_rule.update()
 
         avg_loss.append(loss)
 
@@ -333,18 +298,6 @@ def main(**kwargs):
                         'loss %.4f' % mean_loss,
                         'example %d' % epoch,
                         "%s" % Y[np.arange(min(len(x_a), len(Y))), x_a[:min(len(x_a), len(Y))]],
-                        #"%s" % Y[0, [
-                        #    db.vocab['0'],
-                        #    db.vocab['1'],
-                        #    db.vocab['2'],
-                        #    db.vocab['3'],
-                        #    db.vocab['4'],
-                        #    db.vocab['5'],
-                        #    db.vocab['6'],
-                        #    db.vocab['7'],
-                        #    db.vocab['8'],
-                        #    db.vocab['9']
-                        #]],
                         " ".join([db.vocab.rev(x) for x in x_q]), '->', x_a_hat_str,
                         "(%s)" % x_a_str,
                         "%s" % ("*" if x_a_str == x_a_hat_str else "")
@@ -409,4 +362,4 @@ if __name__ == '__main__':
 #  - Adding Adam learning rule.
 #  - Evaluation
 #    - BLEU, WER, PER.
-#  - Add gradient checks for NTON.
+#  x Add gradient checks for NTON.
