@@ -29,6 +29,38 @@ class TestNTON(unittest.TestCase):
         self.assertEqual(len(y), len(Y))
         self.assertEqual(len(y), nton.max_gen)
 
+    def test_backward_gen(self):
+        calc = DataCalc(max_num=5, n_words=50)
+        db = DB(calc.get_db(), calc.get_vocab())
+        n_words = len(db.vocab)
+
+        emb = OneHot(n_tokens=len(db.vocab))
+
+
+        nton = NTON(
+            n_tokens=len(db.vocab),
+            db=db,
+            emb=emb,
+            n_cells=5
+        )
+        nton.print_step = lambda *args, **kwargs: None
+        shapes = [
+            (n_words, ),
+            (nton.n_cells,),
+            (nton.n_cells,),
+            (6, nton.n_cells),
+            (6, n_words)
+        ]
+        check = check_finite_differences(
+            nton.forward_gen_step,
+            nton.backward_gen_step,
+            gen_input_fn=lambda: tuple(np.random.randn(*shp) for shp in shapes),
+            aux_only=True,
+            n_times=100
+        )
+        self.assertTrue(check)
+
+
     def test_backward(self):
         calc = DataCalc(max_num=5, n_words=50)
         db = DB(calc.get_db(), calc.get_vocab())

@@ -94,6 +94,9 @@ class LSTM(ParametrizedBlock):
           n,b,d = Hout.shape
           input_size = WLSTM.shape[0] - d - 1 # -1 due to bias
 
+          assert dC.shape == C.shape, "%s vs %s" % (dC.shape, C.shape, )
+          assert dH.shape == dC.shape, "%s vs %s" % (dH.shape, dC.shape, )
+
           # backprop the LSTM
           dIFOG = np.zeros(IFOG.shape)
           dIFOGf = np.zeros(IFOGf.shape)

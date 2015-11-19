@@ -60,20 +60,12 @@ class NTON(ParametrizedBlock):
 
         self.parametrize(Vars(**params), Vars(**grads))
 
-    def forward(self, (E, dec_symbol), no_print=True):
+    def forward(self, (E, dec_symbol), no_print=False):
         # Process input sequence.
         h0, c0 = self.input_rnn.get_init()
         ((H, C ), H_aux) = self.input_rnn.forward((E[:, np.newaxis, :], h0, c0, ))
         H = H[:, 0]
         C = C[:, 0]
-
-        # Generate answer.
-        query_t_aux = []
-        db_result_t_aux = []
-        h_t_aux = []
-        rnn_result_aux = []
-        switch_p_aux = []
-        switch_aux = []
 
         h_tm1 = H[-1]       # Initial state of the output RNN is equal to the input RNN.
         c_tm1 = C[-1]
@@ -83,65 +75,16 @@ class NTON(ParametrizedBlock):
 
         Y = []
         y = []
+        gen_aux = []
         for i in range(self.max_gen):   # Generate maximum `max_gen` words.
-            #((y_t[np.newaxis, :], h_t, c_t), aux) = self.forward_gen_step((y_tm1, h_tm1, c_tm1, H, E))
-            # Get the answer from RNN.
-            ((h_t, c_t), h_t_aux_curr) = self.output_rnn.forward((y_tm1[:, np.newaxis, :], h_tm1, c_tm1))
-            h_t = h_t[0][0]
-            c_t = c_t[0][0]
+            ((y_tm1, h_tm1, c_tm1), aux_t) = self.forward_gen_step((y_tm1, h_tm1, c_tm1, H, E))
 
-            # Get RNN LM result.
-            ((rnn_result_t, ), rnn_result_aux_curr) = self.output_rnn_clf.forward((h_t, ))
+            Y.append(y_tm1.squeeze())
+            gen_aux.append(aux_t)
 
-            # Get the result from database.
-            ((query_t, ), query_t_aux_curr) = self.att.forward((H, h_t, E, ))
-            ((db_result_t, ), db_result_t_aux_curr) = self.db.forward((query_t, ))
-
-            # Get the value of switch between RNN and database.
-            ((p1, ), switch_p_aux_curr) = self.output_switch_p.forward((h_t, ))
-
-            # Get switched output.
-            ((y_t, ), switch_aux_curr) = Switch.forward((p1, rnn_result_t, db_result_t))
-            y_t = y_t.squeeze()
-
-            # Save auxiliary variables for backward computation.
-            query_t_aux.append(query_t_aux_curr)
-            db_result_t_aux.append(db_result_t_aux_curr)
-            h_t_aux.append(h_t_aux_curr)
-            rnn_result_aux.append(rnn_result_aux_curr)
-            switch_p_aux.append(switch_p_aux_curr)
-            switch_aux.append(switch_aux_curr)
-
-            # Decode the current word.
             #prev_y_ndx = np.random.choice(self.n_tokens, p=y_t)
-            prev_y_ndx = y_t.argmax()
-
-            #((prev_y, ), _) = self.emb.forward(([prev_y_ndx], ))
-            y_tm1 = y_t[np.newaxis, :]
-            h_tm1 = h_t
-            c_tm1 = c_t
-
-            # Save result.
-            Y.append(y_t)
-            y.append(prev_y_ndx)
-
-            # Debug print something.
-            db_argmax = np.argmax(db_result_t)
-            rnn_argmax = np.argmax(rnn_result_t)
-
-            if not no_print:
-                self.print_step('gen',
-                    '  ',
-                    'gen: %s' % self.db.vocab.rev(prev_y_ndx),
-                    'att: %s' % query_t_aux_curr['alpha'],
-                    'sw: %.2f' % p1,
-                    'rnn: %s (%.2f)' % (self.db.vocab.rev(rnn_argmax), rnn_result_t[rnn_argmax]),
-                    'db: %s (%.2f)' % (self.db.vocab.rev(db_argmax), db_result_t[db_argmax]),
-
-                )
-
-            #if prev_y_ndx == self.db.vocab['[EOS]']:
-            #    break
+            y_decoded_token = y_tm1.argmax()
+            y.append(y_decoded_token)
 
         Y = np.array(Y)
         y = np.array(y)
@@ -149,82 +92,87 @@ class NTON(ParametrizedBlock):
         return ((Y, y), Vars(
             H_aux=H_aux,
             gen_n=len(y),
-            query_t_aux=query_t_aux,
-            db_result_t_aux=db_result_t_aux,
-            h_t_aux=h_t_aux,
-            rnn_result_aux=rnn_result_aux,
-            switch_p_aux=switch_p_aux,
-            switch_aux=switch_aux
+            gen_aux=gen_aux
         ))
 
     def forward_gen_step(self, (y_tm1, h_tm1, c_tm1, H, E)):
-        # Get the answer from RNN.
-        ((h_t, c_t), h_t_aux_curr) = self.output_rnn.forward((y_tm1[:, np.newaxis, :], h_tm1, c_tm1))
+        # print '-'
+        # print 'in', y_tm1.shape
+        # print 'in', h_tm1.shape
+        # print 'in', c_tm1.shape
+        # print 'in', H.shape
+        # print 'in', E.shape
+
+
+        ((h_t, c_t), h_t_aux_curr) = self.output_rnn.forward((y_tm1[np.newaxis, np.newaxis, :], h_tm1, c_tm1))
         h_t = h_t[0][0]
         c_t = c_t[0][0]
 
-        # Get RNN LM result.
-        ((rnn_result_t, ), rnn_result_aux_curr) = self.output_rnn_clf.forward((h_t, ))
+        ((rnn_result_t, ), rnn_result_aux_curr) = self.output_rnn_clf.forward((h_t, ))  # Get RNN LM result.
 
-        # Get the result from database.
-        ((query_t, ), query_t_aux_curr) = self.att.forward((H, h_t, E, ))
+        ((query_t, ), query_t_aux_curr) = self.att.forward((H, h_t, E, ))      # Get the result from database.
         ((db_result_t, ), db_result_t_aux_curr) = self.db.forward((query_t, ))
 
-        # Get the value of switch between RNN and database.
-        ((p1, ), switch_p_aux_curr) = self.output_switch_p.forward((h_t, ))
-
-        # Get switched output.
-        ((y_t, ), switch_aux_curr) = Switch.forward((p1, rnn_result_t, db_result_t))
+        ((p1, ), switch_p_aux_curr) = self.output_switch_p.forward((h_t, ))    # Get the value of switch between RNN and database.
+        ((y_t, ), aux_y_t) = Switch.forward((p1, rnn_result_t, db_result_t))   # Get switched output.
         y_t = y_t.squeeze()
 
         aux = Vars(
+            h_t=h_t_aux_curr,
+            rnn_result_t=rnn_result_aux_curr,
             query_t=query_t_aux_curr,
             db_result_t=db_result_t_aux_curr,
             p1=switch_p_aux_curr,
-            y_t=switch_aux_curr
+            y_t=aux_y_t,
         )
 
-        return ((y_t[np.newaxis, :], h_t, c_t), aux)
+        self.forward_gen_step_debug(**locals())
 
-        """# Save auxiliary variables for backward computation.
-        query_t_aux.append(query_t_aux_curr)
-        db_result_t_aux.append(db_result_t_aux_curr)
-        h_t_aux.append(h_t_aux_curr)
-        rnn_result_aux.append(rnn_result_aux_curr)
-        switch_p_aux.append(switch_p_aux_curr)
-        switch_aux.append(switch_aux_curr)
+        # print 'out', y_t.shape
+        # print 'out', h_t.shape
+        # print 'out', c_t.shape
 
-        # Decode the current word.
-        #prev_y_ndx = np.random.choice(self.n_tokens, p=y_t)
-        prev_y_ndx = y_t.argmax()
+        return ((y_t, h_t, c_t), aux)
 
-        #((prev_y, ), _) = self.emb.forward(([prev_y_ndx], ))
-        y_tm1 = y_t[np.newaxis, :]
-        h_tm1 = h_t
-        c_tm1 = c_t
+    def backward_gen_step(self, aux, (dy_t, dh_t, dc_t)):
+        # print 'd', dy_t.shape
+        # print 'd', dh_t.shape
+        # print 'd', dc_t.shape
 
-        # Save result.
-        Y.append(y_t)
-        y.append(prev_y_ndx)
+        (dp1, drnn_result_t, ddb_result_t, ) =      Switch.backward(aux['y_t'], (dy_t , ))
+        (dh_t_1, ) = self.output_switch_p.backward(aux['p1'], (dp1, ))
+        (dh_t_2, ) =  self.output_rnn_clf.backward(aux['rnn_result_t'], (drnn_result_t, ))
+        (dquery_t, )           =  self.db.backward(aux['db_result_t'], (ddb_result_t, ))
+        (dH_t, dh_t_3, dE_t, ) = self.att.backward(aux['query_t'], (dquery_t, ))
 
+
+        (dx_t, dh_tm1, dc_tm1, ) = self.output_rnn.backward(aux['h_t'], ((dh_t + dh_t_1 + dh_t_2 + dh_t_3)[None, None, :], dc_t[None, None, :], ))
+
+        # print 'dout', dx_t[:, 0].shape
+        # print 'dout', dh_tm1[0].shape
+        # print 'dout', dc_tm1[0].shape
+        # print 'dout', dH_t.shape
+        # print 'dout', dE_t.shape
+
+        return (dx_t[0, 0], dh_tm1[0], dc_tm1[0], dH_t, dE_t, )
+
+
+    def forward_gen_step_debug(self_, y_t, db_result_t, rnn_result_t, query_t_aux_curr, p1, **kwargs):
+        self = self_
         # Debug print something.
         db_argmax = np.argmax(db_result_t)
         rnn_argmax = np.argmax(rnn_result_t)
+        y_t_argmax = y_t.argmax()
 
-        if not no_print:
-            self.print_step('gen',
-                '  ',
-                'gen: %s' % self.db.vocab.rev(prev_y_ndx),
-                'att: %s' % query_t_aux_curr['alpha'],
-                'sw: %.2f' % p1,
-                'rnn: %s (%.2f)' % (self.db.vocab.rev(rnn_argmax), rnn_result_t[rnn_argmax]),
-                'db: %s (%.2f)' % (self.db.vocab.rev(db_argmax), db_result_t[db_argmax]),
+        self.print_step('gen',
+            '  ',
+            'gen: %s' % self.db.vocab.rev(y_t_argmax),
+            'att: %s' % query_t_aux_curr['alpha'],
+            'sw: %.2f' % p1,
+            'rnn: %s (%.2f)' % (self.db.vocab.rev(rnn_argmax), rnn_result_t[rnn_argmax]),
+            'db: %s (%.2f)' % (self.db.vocab.rev(db_argmax), db_result_t[db_argmax]),
 
-            )
-
-        #if prev_y_ndx == self.db.vocab['[EOS]']:
-        #    break
-        """
+        )
 
     def print_step(self, t, *args):
         widths = self.print_widths[t]
@@ -240,33 +188,14 @@ class NTON(ParametrizedBlock):
 
     def backward(self, aux, (grads, _)):
         H_aux = aux['H_aux']
-        rnn_result_aux = aux['rnn_result_aux']
-        switch_p_aux = aux['switch_p_aux']
-        switch_aux = aux['switch_aux']
-        h_t_aux = aux['h_t_aux']
-        db_result_t_aux = aux['db_result_t_aux']
-        query_t_aux = aux['query_t_aux']
-
-        #for p in self.output_switch_p.grads.values() + self.output_rnn_clf.grads.values() + self.att.grads.values() + self.output_rnn.grads.values() + self.input_rnn.grads.values():
-        #    print np.sum(p != 0)
+        gen_aux = aux['gen_aux']
 
         dh_tp1, dc_tp1 = self.output_rnn.get_init_grad()
         dx_tp1 = np.zeros_like(grads[0])
         dH = None
         dE = None
         for i in reversed(range(aux['gen_n'])):
-            (dp1, din1, din2, ) =      Switch.backward(switch_aux[i], (grads[i] , ))
-            (dh_t_1, ) = self.output_switch_p.backward(switch_p_aux[i], (dp1, ))
-            (dh_t_2, ) =  self.output_rnn_clf.backward(rnn_result_aux[i], (din1, ))
-
-            (dquery_t, )           =  self.db.backward(db_result_t_aux[i], (din2, ))
-            (dH_t, dh_t_3, dE_t, ) = self.att.backward(query_t_aux[i], (dquery_t, ))
-
-            dh_t = dh_t_1 + dh_t_2 + dh_t_3 + dh_tp1
-            dc_t = dc_tp1
-
-            (dx_t, dh_tm1, dc_tm1, ) = self.output_rnn.backward(h_t_aux[i], (dh_t, dc_t, ))
-            dx_tp1 = dx_t.squeeze()
+            (dx_tp1, dh_tp1, dc_tp1, dH_t, dE_t) = self.backward_gen_step(gen_aux[i], (dx_tp1 + grads[i], dh_tp1, dc_tp1))
 
             if dH is None:
                 dH = dH_t.copy()
@@ -278,8 +207,6 @@ class NTON(ParametrizedBlock):
             else:
                 dE += dE_t
 
-            dh_tp1 = dh_tm1
-            dc_tp1 = dc_tm1
 
         dH[-1] += dh_tp1.squeeze()  # Output RNN back to Input RNN last state.
         dC = np.zeros_like(dH)
@@ -385,6 +312,7 @@ def main(**kwargs):
         # Prepare input.
         ((x_q_emb, ), _) = emb.forward((x_q, ))
         ((symbol_dec, ), _) = emb.forward(([db.vocab['[EOS]']], ))
+        symbol_dec = symbol_dec[0]
 
         ((Y, y), aux) = nton.forward((x_q_emb, symbol_dec))
         ((loss, ), loss_aux) = SeqLoss.forward((Y, x_a, ))
@@ -440,6 +368,7 @@ def eval_nton(nton, emb, db, data_label, data, n_examples):
         x_q, x_a = nton.prepare_data_signle(next(data))
         ((x_q_emb, ), _) = emb.forward((x_q, ))
         ((symbol_dec, ), _) = emb.forward(([db.vocab['[EOS]']], ))
+        symbol_dec = symbol_dec[0]
         print "Q:", " ".join([db.vocab.rev(x) for x in x_q])
         print "A:", " ".join([db.vocab.rev(x) for x in x_a])
         ((Y, y), aux) = nton.forward((x_q_emb, symbol_dec))
