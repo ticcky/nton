@@ -73,21 +73,22 @@ class TestNTON(unittest.TestCase):
             emb=emb,
             n_cells=5
         )
-        nton.max_gen = 2
+        nton.print_step = lambda *args, **kwargs: None
+        #nton.max_gen = 3
         ((dec_sym, ), _) = emb.forward(([db.vocab['[EOS]']], ))
 
         def gen_input():
             ((E, ), _) = emb.forward((np.random.randint(1, len(db.vocab), (5, )), ))
 
-            return (E, dec_sym, )
+            return (E, dec_sym[0], )
 
-        # check = check_finite_differences(
-        #     nton.forward,
-        #     nton.backward,
-        #     gen_input_fn=gen_input,
-        #     aux_only=True
-        # )
-        # self.assertTrue(check)
+        check = check_finite_differences(
+            nton.forward,
+            nton.backward,
+            gen_input_fn=gen_input,
+            aux_only=True
+        )
+        self.assertTrue(check)
 
         # ['att__Wh', 'att__Wy', 'att__w', 'in_rnn__WLSTM', 'out_rnn__WLSTM',
         # 'out_rnn_clf__00__W', 'out_rnn_clf__00__b', 'switch__00__W', 'switch__00__b']

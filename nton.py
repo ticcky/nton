@@ -145,7 +145,6 @@ class NTON(ParametrizedBlock):
         (dquery_t, )           =  self.db.backward(aux['db_result_t'], (ddb_result_t, ))
         (dH_t, dh_t_3, dE_t, ) = self.att.backward(aux['query_t'], (dquery_t, ))
 
-
         (dx_t, dh_tm1, dc_tm1, ) = self.output_rnn.backward(aux['h_t'], ((dh_t + dh_t_1 + dh_t_2 + dh_t_3)[None, None, :], dc_t[None, None, :], ))
 
         # print 'dout', dx_t[:, 0].shape
