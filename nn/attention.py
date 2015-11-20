@@ -5,6 +5,7 @@ from vars import Vars
 from softmax import Softmax
 from activs import Tanh
 from linear import Dot
+from utils import timeit
 
 
 class Attention(ParametrizedBlock):
@@ -20,6 +21,7 @@ class Attention(ParametrizedBlock):
 
         self.parametrize(params, grads)
 
+    @timeit
     def forward(self, (h_out, g_t, emb_in)):
         Wy = self.params['Wy']
         Wh = self.params['Wh']
@@ -65,6 +67,7 @@ class Attention(ParametrizedBlock):
 
         return ((query, ), aux)
 
+    @timeit
     def backward(self, aux, (dquery, )):
         h_out = aux['h_out']
         g_t = aux['g_t']

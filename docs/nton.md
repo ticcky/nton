@@ -39,7 +39,17 @@ and matrix $R$ defines what output words does given database entry belong to.
 They together encode the collection of database entries $E$.
     
 
+# Extensions
 
+## Multi-turn
+
+## More queries to database in 1 turn
+
+## Real Data
+
+## Assembling query from more tokens
+
+## Larger database
 
 
 

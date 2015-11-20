@@ -100,3 +100,24 @@ class TestParamGradInLayer:
         self.layer.backward(aux, grads)
 
         return (self.layer.grads[self.param_name], )
+
+
+
+
+
+import time
+
+def timeit(method):
+    return method
+
+    def timed(*args, **kw):
+        ts = time.time()
+        result = method(*args, **kw)
+        te = time.time()
+
+        print 'timing: %r %r %2.2f sec' % \
+              (method.__code__.co_filename, method.__name__, te-ts)
+        #(method.__name__, args, kw, te-ts)
+        return result
+
+    return timed

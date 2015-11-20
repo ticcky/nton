@@ -211,16 +211,37 @@ class NTON(ParametrizedBlock):
         return (x_q, x_a)
 
 
-def plot(losses, plot_filename):
+def plot(losses, eval_index, (train_wers, train_accs), (test_wers, test_accs), plot_filename):
     """Plot learning curve."""
     pal = sbt.color_palette()
     col1 = pal[0]
     col2 = pal[2]
-    fig, ax1 = plt.subplots()
+    fig, ax1 = plt.subplots(linewidth=1)
 
-    ax1.plot(losses, '-', linewidth=1, color=col1)
-    ax1.set_xlabel('Example')
-    ax1.set_ylabel('Avg loss', color=col1)
+    plots = []
+    plot_labels = []
+    plots.append(ax1.plot(2**np.array(losses), '-', linewidth=1, color=col1)[0])
+    plot_labels.append('Perplexity')
+    #ax1.set_xlabel('Example')
+    #ax1.set_ylabel('Avg loss', color=col1)
+    #ax1.legend()
+
+    ax2 = ax1.twinx()
+
+    #plots.append(ax2.plot(eval_index, train_wers, 'o-', label='Train WER', markersize=2, linewidth=1)[0])
+    #plot_labels.append('Train WER')
+    #plots.append(ax2.plot(eval_index, train_accs, 'o-', label='Train Acc', markersize=2, linewidth=1)[0])
+    #plot_labels.append('Train Acc')
+    plots.append(ax2.plot(eval_index, test_wers, 'o-', label='Test WER', markersize=2, linewidth=1)[0])
+    plot_labels.append('Test WER')
+    plots.append(ax2.plot(eval_index, test_accs, 'o-', label='Test Acc', markersize=2, linewidth=1)[0])
+    plot_labels.append('Test Acc')
+
+    #ax2.legend()
+
+    fig.legend(plots, plot_labels, 'upper right')
+    #legend = plt.legend(loc='upper right')
+
     #ax1.set_ylim([0.0, 1.0])
 
     #ax2 = ax1.twinx()
@@ -235,7 +256,7 @@ def main(**kwargs):
     np.set_printoptions(edgeitems=3,infstr='inf',
                         linewidth=200, nanstr='nan', precision=4,
                         suppress=False, threshold=1000, formatter={'float': lambda x: "%.1f" % x})
-    calc = DataCalc()
+    calc = DataCalc(max_num=100)
     data_train = calc.gen_data(test_data=False)
     data_test = calc.gen_data(test_data=True)
 
@@ -267,6 +288,11 @@ def main(**kwargs):
 
     avg_loss = deque(maxlen=20)
     losses = []
+    train_wers = []
+    train_accs = []
+    test_wers = []
+    test_accs = []
+    eval_index = []
     for epoch in xrange(10000000):
         x_q, x_a = nton.prepare_data_signle(next(data_train))
 
@@ -305,11 +331,17 @@ def main(**kwargs):
         print
 
         if epoch % eval_step == 0 and epoch > 0:
-            eval_nton(nton, emb, db, 'train', data_train, 200)
-            eval_nton(nton, emb, db, 'test', data_test, 200)
+            #train_wer, train_acc = eval_nton(nton, emb, db, 'train', data_train, 200)
+            test_wer, test_acc = eval_nton(nton, emb, db, 'test', data_test, 30)
+
+            #train_wers.append(train_wer)
+            #train_accs.append(train_acc)
+            test_wers.append(test_wer)
+            test_accs.append(test_acc)
+            eval_index.append(epoch)
 
         if epoch % 100 == 0:
-            plot(losses, 'lcurve.png')
+            plot(losses, eval_index, (train_wers, train_accs), (test_wers, test_accs), 'lcurve.png')
 
 
 def eval_nton(nton, emb, db, data_label, data, n_examples):
@@ -336,6 +368,8 @@ def eval_nton(nton, emb, db, data_label, data, n_examples):
     print '  %15.15s %.2f' % ("Accuracy:", np.mean(acc)),
     print
 
+    return np.mean(wers), np.mean(acc)
+
 
 
 if __name__ == '__main__':
@@ -359,7 +393,7 @@ if __name__ == '__main__':
 #  - Making the task more difficult
 #    - more db lookups needed per query
 #    - larger db
-#  - Adding Adam learning rule.
+#  x Adding Adam learning rule.
 #  - Evaluation
 #    - BLEU, WER, PER.
 #  x Add gradient checks for NTON.

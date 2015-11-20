@@ -3,9 +3,10 @@ import random
 
 
 class DataCalc(object):
-    def __init__(self, n_words=100, max_num=10, n_answer_tpls=3, n_simple_qa_pairs=7):
+    def __init__(self, n_words=100, max_num=10, n_answer_tpls=3, n_simple_qa_pairs=7, percent_qa=0.0):
         self.vocab = ["w%.3d" % i for i in range(n_words)]
         self.max_num = max_num
+        self.percent_qa = percent_qa
 
         p_w = np.zeros((len(self.vocab), ))
         for i in range(len(p_w)):
@@ -56,7 +57,7 @@ class DataCalc(object):
 
     def gen_data(self, test_data=False, simple_answer=False, simple_question=False):
         while True:
-            if np.random.random() < 0.7:
+            if np.random.random() < self.percent_qa:
                 yield random.choice(self.simple_qa_pairs)
             else:
                 a = np.random.randint(1, self.max_num)

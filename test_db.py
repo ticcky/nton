@@ -38,7 +38,46 @@ class TestDB(TestCase):
 
 
     def test_backward(self):
-        db = DB(self.content, self.vocab)
+        db = DB(self.content, self.vocab, impl='normal')
+        db_fast = DB(self.content, self.vocab, impl='fast')
+
+        def gen_input():
+            food = np.random.choice(['chinese', 'czech', 'english', 'indian'])
+            x = db.get_vector(food)
+            x += np.random.randn(*x.shape)
+
+            return (x, )
+
+        for i in range(100):
+            x = gen_input()
+            ((y1, ), aux1) = db.forward(x)
+            ((y2, ), aux2) = db_fast.forward(x)
+
+            err = np.random.randn(*y1.shape)
+            (dx1, ) = db.backward(aux1, (err, ))
+            (dx2, ) = db_fast.backward(aux1, (err, ))
+
+            self.assertTrue(np.allclose(y1, y2))
+            self.assertTrue(np.allclose(dx1, dx2))
+
+        check = check_finite_differences(
+            db.forward_nosoft_fast,
+            db.backward_nosoft_fast,
+            gen_input_fn=gen_input,
+            aux_only=True
+        )
+        self.assertTrue(check)
+
+        check = check_finite_differences(
+            db.forward_nosoft,
+            db.backward_nosoft,
+            gen_input_fn=gen_input,
+            aux_only=True
+        )
+        self.assertTrue(check)
+
+    def test_backward_fast(self):
+        db = DB(self.content, self.vocab, impl='fast')
 
         def gen_input():
             food = np.random.choice(['chinese', 'czech', 'english', 'indian'])
@@ -48,8 +87,8 @@ class TestDB(TestCase):
             return (x, )
 
         check = check_finite_differences(
-            db.forward_nosoft,
-            db.backward_nosoft,
+            db.forward_nosoft_fast,
+            db.backward_nosoft_fast,
             gen_input_fn=gen_input,
             aux_only=True
         )
@@ -63,4 +102,5 @@ class TestDB(TestCase):
 
 
 if __name__ == "__main__":
+    np.random.seed(0)
     main()

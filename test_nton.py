@@ -74,7 +74,7 @@ class TestNTON(unittest.TestCase):
             n_cells=5
         )
         nton.print_step = lambda *args, **kwargs: None
-        #nton.max_gen = 3
+        #nton.max_gen =
         ((dec_sym, ), _) = emb.forward(([db.vocab['[EOS]']], ))
 
         def gen_input():

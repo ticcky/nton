@@ -49,8 +49,8 @@ class AdaMax(object):
 
 
 class Adam(object):
-    #def __init__(self, params, grads, alpha=0.002, beta1=0.9, beta2=0.999):
-    def __init__(self, params, grads, alpha=0.0002, beta1=0.1, beta2=0.001, eps=1e-8):
+    def __init__(self, params, grads, alpha=0.002, beta1=0.9, beta2=0.999, eps=1e-8):
+        #def __init__(self, params, grads, alpha=0.0002, beta1=0.1, beta2=0.001, eps=1e-8):
         self.params = params
         self.grads = grads
 

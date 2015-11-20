@@ -7,6 +7,8 @@ import numpy as np
 from base import ParametrizedBlock
 from vars import Vars
 
+from utils import timeit
+
 class LSTM(ParametrizedBlock):
     def __init__(self, n_in, n_out):
         self.n_cells = n_out
@@ -27,6 +29,7 @@ class LSTM(ParametrizedBlock):
     def get_init_grad(self):
         return (np.zeros((self.n_cells, )), np.zeros((self.n_cells, )))
 
+    @timeit
     def forward(self, (x, h0, c0 )):
         """
         X should be of shape (t,b,input_size), where t = length of sequence, b = batch size
@@ -78,6 +81,7 @@ class LSTM(ParametrizedBlock):
 
         return ((Hout, C), aux)  # TODO: Do proper gradient backward for C
 
+    @timeit
     def backward(self, aux, grads):
           dH = grads[0].copy()
           dC = grads[1].copy()

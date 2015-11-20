@@ -1,8 +1,10 @@
 import numpy as np
+from collections import defaultdict
 
 from nn import Block, Vars, Dot, Softmax
 
 from vocab import Vocab
+from nn.utils import timeit
 
 VOCAB = """i would like some chinese food
 what about indian
@@ -23,7 +25,7 @@ class DB(Block):
     #     ('english', 'tavern'),
     # ]
 
-    def __init__(self, content, vocab):
+    def __init__(self, content, vocab, impl='fast'):
         self.content = content
 
         self.vocab = Vocab()
@@ -31,6 +33,9 @@ class DB(Block):
 
         for word in vocab:
             self.vocab.add(word)
+
+        self.db_map = defaultdict(list)
+        self.db_map_rev = defaultdict(list)
 
         entries_a = []
         for food, restaurant in self.content:
@@ -46,10 +51,25 @@ class DB(Block):
             #entry[f_id] = -1
             entries_c.append(entry)
 
+            self.db_map[self.vocab[food]].append(self.vocab[restaurant])
+            self.db_map[self.vocab[restaurant]].append(self.vocab[restaurant])
+            #self.db_map[self.vocab[food]].append(self.vocab[food])
+            self.db_map_rev[self.vocab[restaurant]].append(self.vocab[food])
+            self.db_map_rev[self.vocab[restaurant]].append(self.vocab[restaurant])
+
+        self.db_map = dict(self.db_map)
+        self.db_map_rev = dict(self.db_map_rev)
+
         self.entries_c = np.array(entries_c)
 
-        self.forward = self.forward_nosoft
-        self.backward = self.backward_nosoft
+        if impl == 'fast':
+            self.forward = self.forward_nosoft_fast
+            self.backward = self.backward_nosoft_fast
+        elif impl == 'normal':
+            self.forward = self.forward_nosoft
+            self.backward = self.backward_nosoft
+        else:
+            assert False, 'Unknown implementation type: %s' % impl
 
     def words_to_ids(self, words):
         res = []
@@ -96,7 +116,6 @@ class DB(Block):
 
         return ((result, ), aux)
 
-
     def backward(self, aux, (dy, )):
         x = aux['x']
         w = aux['w']
@@ -115,6 +134,7 @@ class DB(Block):
 
         return (dx[:, 0], )
 
+    @timeit
     def forward_nosoft(self, (x, )):
         ((Ax, ), Ax_aux) = Dot.forward((self.entries_a, x))
 
@@ -136,6 +156,28 @@ class DB(Block):
 
         return ((w, ), aux)
 
+    def forward_nosoft_fast(self, (x, )):
+        w = np.zeros_like(x)
+        for i, val in enumerate(x):
+            if i in self.db_map:
+                #print 'adding', self.vocab.rev(i), val, [self.vocab.rev(aa) for aa in self.db_map[i]]
+                w[self.db_map[i]] += val
+
+        aux = Vars(
+            w=w
+        )
+
+        return ((w, ), aux)
+
+    def backward_nosoft_fast(self, aux, (dy, )):
+        dx = np.zeros_like(dy)
+        for i, val in enumerate(dy):
+            if i in self.db_map_rev:
+                dx[self.db_map_rev[i]] += val
+
+        return (dx, )
+
+    @timeit
     def backward_nosoft(self, aux, (dy, )):
         w_aux = aux['w_aux']
         Ax_aux = aux['Ax_aux']
