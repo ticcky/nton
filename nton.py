@@ -11,9 +11,9 @@ sbt.set()
 from nn import LSTM, OneHot, Sequential, LinearLayer, Softmax, Sigmoid, Vars, ParametrizedBlock, VanillaSGD, Adam
 from nn.attention import Attention
 from nn.switch import Switch
-from db import DB
+from db2 import DB2
 from seq_loss import SeqLoss
-from data_calc import DataCalc
+from data_calc2 import DataCalc2
 import metrics
 
 
@@ -37,13 +37,15 @@ class NTON(ParametrizedBlock):
             LinearLayer(n_in=n_cells, n_out=1),
             Sigmoid()
         ])
-        self.att = Attention(n_hidden=n_cells)
+        self.att1 = Attention(n_hidden=n_cells)
+        self.att2 = Attention(n_hidden=n_cells)
 
         self.param_layers, self.param_layers_names = zip(*[
             (self.output_switch_p, 'switch'),
             (self.output_rnn_clf, 'out_rnn_clf'),
             (self.output_rnn, 'out_rnn'),
-            (self.att, 'att'),
+            (self.att1, 'att1'),
+            (self.att2, 'att2'),
             (self.input_rnn, 'in_rnn'),
         ])
 
@@ -91,8 +93,9 @@ class NTON(ParametrizedBlock):
 
         ((rnn_result_t, ), rnn_result_aux_curr) = self.output_rnn_clf.forward((h_t, ))  # Get RNN LM result.
 
-        ((query_t, ), query_t_aux_curr) = self.att.forward((H, h_t, E, ))      # Get the result from database.
-        ((db_result_t, ), db_result_t_aux_curr) = self.db.forward((query_t, ))
+        ((query1_t, ), query1_t_aux_curr) = self.att1.forward((H, h_t, E, ))      # Get the result from database.
+        ((query2_t, ), query2_t_aux_curr) = self.att2.forward((H, h_t, E, ))      # Get the result from database.
+        ((db_result_t, ), db_result_t_aux_curr) = self.db.forward((query1_t, query2_t, ))
 
         ((p1, ), switch_p_aux_curr) = self.output_switch_p.forward((h_t, ))    # Get the value of switch between RNN and database.
         ((y_t, ), aux_y_t) = Switch.forward((p1, rnn_result_t, db_result_t))   # Get switched output.
@@ -101,7 +104,8 @@ class NTON(ParametrizedBlock):
         aux = Vars(
             h_t=h_t_aux_curr,
             rnn_result_t=rnn_result_aux_curr,
-            query_t=query_t_aux_curr,
+            query1_t=query1_t_aux_curr,
+            query2_t=query2_t_aux_curr,
             db_result_t=db_result_t_aux_curr,
             p1=switch_p_aux_curr,
             y_t=aux_y_t,
@@ -115,15 +119,19 @@ class NTON(ParametrizedBlock):
         (dp1, drnn_result_t, ddb_result_t, ) =      Switch.backward(aux['y_t'], (dy_t , ))
         (dh_t_1, ) = self.output_switch_p.backward(aux['p1'], (dp1, ))
         (dh_t_2, ) =  self.output_rnn_clf.backward(aux['rnn_result_t'], (drnn_result_t, ))
-        (dquery_t, )           =  self.db.backward(aux['db_result_t'], (ddb_result_t, ))
-        (dH_t, dh_t_3, dE_t, ) = self.att.backward(aux['query_t'], (dquery_t, ))
+        (dquery1_t, dquery2_t )           =  self.db.backward(aux['db_result_t'], (ddb_result_t, ))
+        (dH_t_1, dh_t_3_1, dE_t_1, ) = self.att1.backward(aux['query1_t'], (dquery1_t, ))
+        (dH_t_2, dh_t_3_2, dE_t_2, ) = self.att2.backward(aux['query2_t'], (dquery2_t, ))
+        dH_t = dH_t_1 + dH_t_2
+        dh_t_3 = dh_t_3_1 + dh_t_3_2
+        dE_t = dE_t_1 + dE_t_2
 
         (dx_t, dh_tm1, dc_tm1, ) = self.output_rnn.backward(aux['h_t'], ((dh_t + dh_t_1 + dh_t_2 + dh_t_3)[None, None, :], dc_t[None, None, :], ))
 
         return (dx_t[0, 0], dh_tm1[0], dc_tm1[0], dH_t, dE_t, )
 
 
-    def forward_gen_step_debug(self_, y_t, db_result_t, rnn_result_t, query_t_aux_curr, p1, **kwargs):
+    def forward_gen_step_debug(self_, y_t, db_result_t, rnn_result_t, query1_t_aux_curr, query2_t_aux_curr, p1, **kwargs):
         self = self_
         # Debug print something.
         db_argmax = np.argmax(db_result_t)
@@ -133,7 +141,8 @@ class NTON(ParametrizedBlock):
         self.print_step('gen',
             '  ',
             'gen: %s' % self.db.vocab.rev(y_t_argmax),
-            'att: %s' % query_t_aux_curr['alpha'],
+            'att1: %s' % query1_t_aux_curr['alpha'],
+            'att2: %s' % query2_t_aux_curr['alpha'],
             'sw: %.2f' % p1,
             'rnn: %s (%.2f)' % (self.db.vocab.rev(rnn_argmax), rnn_result_t[rnn_argmax]),
             'db: %s (%.2f)' % (self.db.vocab.rev(db_argmax), db_result_t[db_argmax]),
@@ -256,11 +265,11 @@ def main(**kwargs):
     np.set_printoptions(edgeitems=3,infstr='inf',
                         linewidth=200, nanstr='nan', precision=4,
                         suppress=False, threshold=1000, formatter={'float': lambda x: "%.1f" % x})
-    calc = DataCalc(max_num=100)
+    calc = DataCalc2(max_num=10)
     data_train = calc.gen_data(test_data=False)
     data_test = calc.gen_data(test_data=True)
 
-    db = DB(calc.get_db(), calc.get_vocab())
+    db = DB2(calc.get_db(), calc.get_vocab())
     db.vocab.freeze()
 
     #q = db.get_vector('1+3')

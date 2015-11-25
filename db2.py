@@ -75,7 +75,6 @@ class DB2(Block):
                     #print '   ', e1_dim, r_dim, e1[e1_dim], r[r_dim]
                     e2[i] += e1[e1_dim] * r[r_dim]
 
-
         aux = Vars(
             e1=e1,
             r=r
