@@ -3,6 +3,10 @@ class Vocab(dict):
         self._rev = dict()
         self.frozen = False
 
+    def __iter__(self):
+        for k, v in sorted(self.items(), key=lambda x: x[1]):
+            yield k
+
     def freeze(self):
         self.frozen = True
 
