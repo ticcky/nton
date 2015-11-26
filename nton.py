@@ -227,23 +227,25 @@ def plot(losses, eval_index, (train_wers, train_accs), (test_wers, test_accs), p
     col2 = pal[2]
     fig, ax1 = plt.subplots(linewidth=1)
 
+    ax2 = ax1.twinx()
+
     plots = []
     plot_labels = []
-    plots.append(ax1.plot(2**np.array(losses), '-', linewidth=1, color=col1)[0])
+    plots.append(ax1.plot(np.array(losses), '-', linewidth=1, color=pal[0])[0])
     plot_labels.append('Perplexity')
     #ax1.set_xlabel('Example')
     #ax1.set_ylabel('Avg loss', color=col1)
     #ax1.legend()
 
-    ax2 = ax1.twinx()
+
 
     #plots.append(ax2.plot(eval_index, train_wers, 'o-', label='Train WER', markersize=2, linewidth=1)[0])
     #plot_labels.append('Train WER')
     #plots.append(ax2.plot(eval_index, train_accs, 'o-', label='Train Acc', markersize=2, linewidth=1)[0])
     #plot_labels.append('Train Acc')
-    plots.append(ax2.plot(eval_index, test_wers, 'o-', label='Test WER', markersize=2, linewidth=1)[0])
+    plots.append(ax2.plot(eval_index, test_wers, 'o-', label='Test WER', markersize=2, linewidth=1, color=pal[1])[0])
     plot_labels.append('Test WER')
-    plots.append(ax2.plot(eval_index, test_accs, 'o-', label='Test Acc', markersize=2, linewidth=1)[0])
+    plots.append(ax2.plot(eval_index, test_accs, 'o-', label='Test Acc', markersize=2, linewidth=1, color=pal[2])[0])
     plot_labels.append('Test Acc')
 
     #ax2.legend()
