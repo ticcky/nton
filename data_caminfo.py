@@ -2,6 +2,7 @@ import numpy as np
 import random
 import os
 import re
+import itertools
 
 from caminfo_tools import data_dstc2
 import local_config as config
@@ -999,6 +1000,8 @@ class DataCamInfo(object):
 
     def __init__(self):
         self.vocab = set()
+        for i in range(10):
+            self.vocab.add(str(i))
         self.re_vocab_map = {}
         self.content = []
         for entry in self.db_content:
@@ -1029,6 +1032,24 @@ class DataCamInfo(object):
 
     def get_db(self):
         return self.content
+
+    def get_db_for(self, ins, out):
+        res = []
+        for entry in self.db_content:
+            key = tuple(entry[x] for x in ins)
+            val = entry[out]
+
+            #res.append((key, val, ))
+
+            keys = []
+            for inp, k in zip(ins, key):
+                keys.append([k, 'dontcare'])
+
+            for key_g in itertools.product(*keys):
+                res.append((key_g, val))
+
+
+        return res
 
 
     def gen_data(self, test_data=False):

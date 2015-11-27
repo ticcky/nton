@@ -10,6 +10,8 @@ class TestDataCaminfo(unittest.TestCase):
         for entry in db_content:
             self.assertTrue(len(entry) == len(db.fields))
 
+        data = db.get_db_for(['food', 'area', 'pricerange'], 'name')
+
         vocab = db.get_vocab()
         data = db.gen_data()
         for i in range(10):
