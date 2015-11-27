@@ -1,8 +1,32 @@
 from unittest import TestCase, main
 import numpy as np
 
-from nn.linear import LinearLayer, Dot
+from nn.linear import LinearLayer, Dot, LearnableInput
 from nn.utils import check_finite_differences, TestParamGradInLayer
+
+
+class TestLearnableInput(TestCase):
+    def test_forward(self):
+        lin = LearnableInput((10, 20))
+
+        inp = np.random.randn(30, 10)
+        ((res, ), _) = lin.forward(())
+
+        self.assertTrue(res.shape == (10, 20))
+
+    def test_backward(self):
+        """Test gradient computation for inputs and all layer's parameters."""
+        lin = LearnableInput((10, 20))
+
+        inp = ()
+        checker = TestParamGradInLayer(lin, 'W', inp)
+        check = check_finite_differences(
+            fwd_fn=checker.forward,
+            bwd_fn=checker.backward,
+            gen_input_fn=lambda: (np.random.randn(*lin.params['W'].shape), ),
+            aux_only=True
+        )
+        self.assertTrue(check)
 
 
 class TestLinearLayer(TestCase):

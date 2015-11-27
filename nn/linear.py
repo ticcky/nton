@@ -12,6 +12,28 @@ class Identity(Block):
     def backward(self, x, y, dy):
         return dy
 
+class LearnableInput(ParametrizedBlock):
+    def __init__(self, shape, init=Normal()):
+        W = init(shape)
+        dW = np.zeros_like(W)
+
+        params = Vars(W=W)
+        grads = Vars(W=dW)
+
+        self.parametrize(params, grads)
+
+    def forward(self, x):
+        assert len(x) == 0
+
+        return ((self.params['W'], ), None)
+
+    def backward(self, aux, (dy, )):
+        self.accum_grads(dy)
+        return None
+
+    def accum_grads(self, dy):
+        self.grads['W'] += dy
+
 
 class LinearLayer(ParametrizedBlock):
     """Affine transformation."""
