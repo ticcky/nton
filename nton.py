@@ -1,5 +1,6 @@
 import random
 from collections import deque, defaultdict
+import time
 
 import numpy as np
 import matplotlib
@@ -68,6 +69,7 @@ class NTON(ParametrizedBlock):
         self.parametrize_from_layers(self.param_layers, self.param_layers_names)
 
     def forward(self, (E, eos_token), no_print=False):
+        t = time.time()
         h0, c0 = self.input_rnn.get_init()
         ((H, C ), H_aux) = self.input_rnn.forward((E[:, np.newaxis, :], h0, c0, ))   # Process input sequence.
         H = H[:, 0]
@@ -82,6 +84,7 @@ class NTON(ParametrizedBlock):
         y = []
         gen_aux = []
         for i in range(self.max_gen):   # Generate maximum `max_gen` words.
+            t = time.time()
             ((y_tm1, h_tm1, c_tm1), aux_t) = self.forward_gen_step((y_tm1, h_tm1, c_tm1, H, E))
 
             Y.append(y_tm1.squeeze())
@@ -146,14 +149,16 @@ class NTON(ParametrizedBlock):
 
     def backward_gen_step(self, aux, (dy_t, dh_t, dc_t)):
         dh_t_lst = [dh_t]
-
+        t = time.time()
         (_, dh_t, datt_sw_out_t) = self.att_switch.backward(aux['y_t'], (dy_t, ))
+
         dh_t_lst.append(dh_t)
         drnn_result_t = datt_sw_out_t[0]
         ddb_results_t = datt_sw_out_t[1:]
 
         dtotal_query = None
         for db, ddb, db_aux in zip(self.dbs, ddb_results_t, aux['db_results_t']):
+            t = time.time()
             dtotal_query_i = db.backward(db_aux, (ddb, ))
             if dtotal_query == None:
                 dtotal_query = tuple(np.zeros_like(x) for x in dtotal_query_i)
@@ -169,6 +174,7 @@ class NTON(ParametrizedBlock):
 
         self.ndx_emb.backward(aux['ndx_emb'], (dndx_emb, ))
 
+        t = time.time()
         dE_lst = []
         dH_lst = []
         for att, att_aux, dquery_t in zip(self.atts, aux['queries_t'], dqueries_t):
@@ -180,6 +186,7 @@ class NTON(ParametrizedBlock):
         dE_t = sum(dE_lst)
         dH_t = sum(dH_lst)
 
+        t = time.time()
         (dh_t, ) = self.output_rnn_clf.backward(aux['rnn_result_t'], (drnn_result_t, ))
         dh_t_lst.append(dh_t)
 
@@ -388,11 +395,13 @@ def main(**kwargs):
         symbol_dec = symbol_dec[0]
 
         nton.max_gen = len(x_a)
+        t = time.time()
         ((Y, y), aux) = nton.forward((x_q_emb, symbol_dec))
         ((loss, ), loss_aux) = SeqLoss.forward((Y, np.array(list(x_a) + [-1] * (len(y) - len(x_a))), ))
         (dY, ) = SeqLoss.backward(loss_aux, 1.0)
 
         nton.backward(aux, (dY, None ))
+
         #nton.update_params(lr=0.1)
         update_rule.update()
 
@@ -417,7 +426,7 @@ def main(**kwargs):
 
         if epoch % eval_step == 0 and epoch > 0:
             #train_wer, train_acc = eval_nton(nton, emb, db, 'train', data_train, 200)
-            test_wer, test_acc = eval_nton(nton, emb, db, 'test', data_test, 30)
+            test_wer, test_acc = eval_nton(nton, emb, vocab, 'test', data_test, 30)
 
             #train_wers.append(train_wer)
             #train_accs.append(train_acc)

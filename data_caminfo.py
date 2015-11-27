@@ -1005,6 +1005,7 @@ class DataCamInfo(object):
         self.vocab = set()
         for i in range(10):
             self.vocab.add(str(i))
+            self.vocab.add("item%.2d" % i)
         for word in train_vocab:
             self.vocab.add(word)
         self.re_vocab_map = {}
@@ -1052,6 +1053,8 @@ class DataCamInfo(object):
 
             for key_g in itertools.product(*keys):
                 res.append((key_g, val))
+                break
+
 
 
         return res
@@ -1089,7 +1092,7 @@ class DataCamInfo(object):
 
                 cache[dialog_dir] = res
 
-            if res[0] != '':
+            if len(res[0]) != 0:
                 yield res
 
 

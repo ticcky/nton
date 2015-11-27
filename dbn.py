@@ -61,6 +61,7 @@ class DBN(Block):
         ex = np.exp(x)
         return ex / np.sum(ex)
 
+    @timeit
     def forward(self, db_input):
         res = np.zeros((len(self.vocab), ))
 
@@ -69,15 +70,14 @@ class DBN(Block):
         for x in db_input:
             assert len(res) == len(x)
 
-        for i in range(len(res)):
-            if i in self.map:
-                #print 'counting', i
-                for dims in self.map[i]:
-                    val = 1.0
-                    for x, xdim in zip(db_input, dims):
-                        val *= x[xdim]
+        for i in self.map.keys():
+            #print 'counting', i
+            for dims in self.map[i]:
+                val = 1.0
+                for x, xdim in zip(db_input, dims):
+                    val *= x[xdim]
 
-                    res[i] += val
+                res[i] += val
 
         aux = Vars(
             db_input=db_input
@@ -85,7 +85,7 @@ class DBN(Block):
 
         return ((res, ), aux)
 
-
+    @timeit
     def backward(self, aux, (dy, )):
         db_input = aux['db_input']
 
@@ -93,26 +93,22 @@ class DBN(Block):
         for v in db_input:
             ddb_input.append(np.zeros_like(v))
 
-        for i in range(len(dy)):
+        for i in self.map.keys():
             dy_i = dy[i]
-            if i in self.map:
-                for dims in self.map[i]:
-                    inp_total = 1.0
 
-                    for x_k, x_kdim in zip(db_input, dims):
-                        inp_total *= x_k[x_kdim]
+            for dims in self.map[i]:
+                inp_total = 1.0
 
-                    for z, (x_k, dx_k, x_kdim) in enumerate(zip(db_input, ddb_input, dims)):
-                        if x_k[x_kdim] > 0:
-                            denom = x_k[x_kdim]
-                        else:
-                            denom = 1.0
-                        dx_k[x_kdim] += dy_i * inp_total / denom
+                for x_k, x_kdim in zip(db_input, dims):
+                    inp_total *= x_k[x_kdim]
 
+                for z, (x_k, dx_k, x_kdim) in enumerate(zip(db_input, ddb_input, dims)):
+                    if x_k[x_kdim] > 0:
+                        denom = x_k[x_kdim]
+                    else:
+                        denom = 1.0
 
-
-
-
+                    dx_k[x_kdim] += dy_i * inp_total / denom
 
         return tuple(ddb_input)
 
