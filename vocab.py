@@ -1,7 +1,16 @@
+import numpy as np
+
+
 class Vocab(dict):
+    oov_token = '#OOV'
+    eos_token = '[EOS]'
+
     def __init__(self):
         self._rev = dict()
         self.frozen = False
+
+        self.add(self.oov_token)
+        self.add(self.eos_token)
 
     def __iter__(self):
         for k, v in sorted(self.items(), key=lambda x: x[1]):
@@ -23,3 +32,13 @@ class Vocab(dict):
 
     def rev(self, word_id):
         return self._rev[word_id]
+
+    def words_to_ids(self, words):
+        res = []
+        for word in words:
+            try:
+                res.append(self[word])
+            except KeyError:
+                res.append(self[self.oov_token])
+
+        return np.array(res)

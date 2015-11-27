@@ -8,23 +8,32 @@ import matplotlib.pyplot as plt
 import seaborn as sbt
 sbt.set()
 
-from nn import LSTM, OneHot, Sequential, LinearLayer, Softmax, Sigmoid, Vars, ParametrizedBlock, VanillaSGD, Adam
+from nn import (LSTM, OneHot, Sequential, LinearLayer, Softmax, Sigmoid, Vars,
+                ParametrizedBlock, VanillaSGD, Adam, Embeddings, LearnableInput)
 from nn.attention import Attention
 from nn.switch import Switch
-from db2 import DB2
+from dbn import DBN
 from seq_loss import SeqLoss
-from data_calc2 import DataCalc2
+from data_caminfo import DataCamInfo
 import metrics
 
 
 class NTON(ParametrizedBlock):
-    def __init__(self, n_tokens, n_cells, db, emb, max_gen=10):
+    def __init__(self, n_tokens, n_cells, dbs, emb, vocab, max_gen=10):
         self.n_tokens = n_tokens
         self.n_cells = n_cells
         self.max_gen = max_gen
+        self.vocab = vocab
 
-        self.db = db
+        self.dbs_keys, self.dbs = zip(*dbs.iteritems())
+
+        self.n_dbs = len(dbs)
         self.emb = emb
+
+        n_ndx = 5
+
+        self.ndx_emb = LearnableInput((n_ndx, n_cells))
+        self.ndx_x = np.array([DBN.get_1hot_from(DBN.item_pattern % i, vocab) for i in range(n_ndx)])
 
         emb_dim = emb.size()
         self.input_rnn = LSTM(n_in=emb_dim, n_out=n_cells)
@@ -33,21 +42,26 @@ class NTON(ParametrizedBlock):
             LinearLayer(n_in=n_cells, n_out=n_tokens),
             Softmax()
         ])
-        self.output_switch_p = Sequential([
-            LinearLayer(n_in=n_cells, n_out=1),
-            Sigmoid()
-        ])
-        self.att1 = Attention(n_hidden=n_cells)
-        self.att2 = Attention(n_hidden=n_cells)
+        self.att_switch = Attention(n_hidden=n_cells)
 
-        self.param_layers, self.param_layers_names = zip(*[
-            (self.output_switch_p, 'switch'),
-            (self.output_rnn_clf, 'out_rnn_clf'),
-            (self.output_rnn, 'out_rnn'),
-            (self.att1, 'att1'),
-            (self.att2, 'att2'),
-            (self.input_rnn, 'in_rnn'),
-        ])
+        self.atts = []
+        for i in range(self.n_dbs):
+            self.atts.append(Attention(n_hidden=n_cells))
+
+        self.att_ndx = Attention(n_hidden=n_cells)
+
+        self.param_layers, self.param_layers_names = zip(*(
+            [
+                (self.output_rnn_clf, 'out_rnn_clf'),
+                (self.output_rnn, 'out_rnn'),
+                (self.att_switch, 'att_switch'),
+                (self.att_ndx, 'att_ndx'),
+                (self.input_rnn, 'in_rnn'),
+            ] + zip(
+                self.atts,
+                ('att%d' % i for i in range(len(self.atts)))
+            )
+        ))
 
         self.print_widths = defaultdict(dict)
 
@@ -93,22 +107,37 @@ class NTON(ParametrizedBlock):
 
         ((rnn_result_t, ), rnn_result_aux_curr) = self.output_rnn_clf.forward((h_t, ))  # Get RNN LM result.
 
-        ((query1_t, ), query1_t_aux_curr) = self.att1.forward((H, h_t, E, ))      # Get the result from database.
-        ((query2_t, ), query2_t_aux_curr) = self.att2.forward((H, h_t, E, ))      # Get the result from database.
-        ((db_result_t, ), db_result_t_aux_curr) = self.db.forward((query1_t, query2_t, ))
+        queries_t = []
+        queries_t_aux = []
+        for att in self.atts:
+            ((query_a_t, ), query_a_t_aux_curr) = att.forward((H, h_t, E, ))      # Get the result from database.
+            queries_t.append(query_a_t)
+            queries_t_aux.append(query_a_t_aux_curr)
 
-        ((p1, ), switch_p_aux_curr) = self.output_switch_p.forward((h_t, ))    # Get the value of switch between RNN and database.
-        ((y_t, ), aux_y_t) = Switch.forward((p1, rnn_result_t, db_result_t))   # Get switched output.
-        y_t = y_t.squeeze()
+        ((ndx_emb, ), ndx_emb_aux) = self.ndx_emb.forward(())
+        ((query_ndx_t, ), query_ndx_t_aux) = self.att_ndx.forward((ndx_emb, h_t, self.ndx_x))
+
+        total_query = tuple(queries_t) + (query_ndx_t, )
+
+        db_results_t = []
+        db_results_t_aux = []
+        for db in self.dbs:
+            ((db_i_result_t, ), db_i_result_t_aux_curr) = db.forward(total_query)
+            db_results_t.append(db_i_result_t)
+            db_results_t_aux.append(db_i_result_t_aux_curr)
+
+        att_sw_in_t = np.zeros((len(db_results_t) + 1, self.n_cells))
+        att_sw_out_t = np.array([rnn_result_t] + db_results_t)
+        ((y_t, ), y_t_aux) = self.att_switch.forward((att_sw_in_t, h_t, att_sw_out_t))
 
         aux = Vars(
             h_t=h_t_aux_curr,
             rnn_result_t=rnn_result_aux_curr,
-            query1_t=query1_t_aux_curr,
-            query2_t=query2_t_aux_curr,
-            db_result_t=db_result_t_aux_curr,
-            p1=switch_p_aux_curr,
-            y_t=aux_y_t,
+            queries_t=queries_t_aux,
+            ndx_emb=ndx_emb_aux,
+            query_ndx_t=query_ndx_t_aux,
+            db_results_t=db_results_t_aux,
+            y_t=y_t_aux,
         )
 
         self.forward_gen_step_debug(**locals())
@@ -116,36 +145,76 @@ class NTON(ParametrizedBlock):
         return ((y_t, h_t, c_t), aux)
 
     def backward_gen_step(self, aux, (dy_t, dh_t, dc_t)):
-        (dp1, drnn_result_t, ddb_result_t, ) =      Switch.backward(aux['y_t'], (dy_t , ))
-        (dh_t_1, ) = self.output_switch_p.backward(aux['p1'], (dp1, ))
-        (dh_t_2, ) =  self.output_rnn_clf.backward(aux['rnn_result_t'], (drnn_result_t, ))
-        (dquery1_t, dquery2_t )           =  self.db.backward(aux['db_result_t'], (ddb_result_t, ))
-        (dH_t_1, dh_t_3_1, dE_t_1, ) = self.att1.backward(aux['query1_t'], (dquery1_t, ))
-        (dH_t_2, dh_t_3_2, dE_t_2, ) = self.att2.backward(aux['query2_t'], (dquery2_t, ))
-        dH_t = dH_t_1 + dH_t_2
-        dh_t_3 = dh_t_3_1 + dh_t_3_2
-        dE_t = dE_t_1 + dE_t_2
+        dh_t_lst = [dh_t]
 
-        (dx_t, dh_tm1, dc_tm1, ) = self.output_rnn.backward(aux['h_t'], ((dh_t + dh_t_1 + dh_t_2 + dh_t_3)[None, None, :], dc_t[None, None, :], ))
+        (_, dh_t, datt_sw_out_t) = self.att_switch.backward(aux['y_t'], (dy_t, ))
+        dh_t_lst.append(dh_t)
+        drnn_result_t = datt_sw_out_t[0]
+        ddb_results_t = datt_sw_out_t[1:]
+
+        dtotal_query = None
+        for db, ddb, db_aux in zip(self.dbs, ddb_results_t, aux['db_results_t']):
+            dtotal_query_i = db.backward(db_aux, (ddb, ))
+            if dtotal_query == None:
+                dtotal_query = tuple(np.zeros_like(x) for x in dtotal_query_i)
+
+            for dtotal_query_ij, dtotal_query_j in zip(dtotal_query_i, dtotal_query):
+                dtotal_query_j += dtotal_query_ij
+
+        dqueries_t = dtotal_query[:-1]
+        dquery_ndx_t = dtotal_query[-1]
+
+        (dndx_emb, dh_t, _, ) = self.att_ndx.backward(aux['query_ndx_t'], (dquery_ndx_t, ))
+        dh_t_lst.append(dh_t)
+
+        self.ndx_emb.backward(aux['ndx_emb'], (dndx_emb, ))
+
+        dE_lst = []
+        dH_lst = []
+        for att, att_aux, dquery_t in zip(self.atts, aux['queries_t'], dqueries_t):
+            (dH, dh_t, dE, ) = att.backward(att_aux, (dquery_t, ))
+            dH_lst.append(dH)
+            dh_t_lst.append(dh_t)
+            dE_lst.append(dE)
+
+        dE_t = sum(dE_lst)
+        dH_t = sum(dH_lst)
+
+        (dh_t, ) = self.output_rnn_clf.backward(aux['rnn_result_t'], (drnn_result_t, ))
+        dh_t_lst.append(dh_t)
+
+        dh_t = sum(dh_t_lst)
+
+        (dx_t, dh_tm1, dc_tm1, ) = self.output_rnn.backward(aux['h_t'], ((dh_t)[None, None, :], dc_t[None, None, :], ))
 
         return (dx_t[0, 0], dh_tm1[0], dc_tm1[0], dH_t, dE_t, )
 
 
-    def forward_gen_step_debug(self_, y_t, db_result_t, rnn_result_t, query1_t_aux_curr, query2_t_aux_curr, p1, **kwargs):
+    def forward_gen_step_debug(self_, y_t, db_results_t, rnn_result_t, queries_t_aux, y_t_aux, **kwargs):
         self = self_
         # Debug print something.
-        db_argmax = np.argmax(db_result_t)
+        db_argmax = np.argmax(db_results_t, axis=1)
         rnn_argmax = np.argmax(rnn_result_t)
         y_t_argmax = y_t.argmax()
 
+        atts = []
+        for qaux in queries_t_aux:
+            atts.append("att: %s" % qaux['alpha'])
+
+        db_results = []
+        for db_res in db_results_t:
+            db_argmax = db_res.argmax()
+            db_results.append(
+                'db: %s (%.2f)' % (self.vocab.rev(db_argmax), db_res[db_argmax])
+            )
+
         self.print_step('gen',
             '  ',
-            'gen: %s' % self.db.vocab.rev(y_t_argmax),
-            'att1: %s' % query1_t_aux_curr['alpha'],
-            'att2: %s' % query2_t_aux_curr['alpha'],
-            'sw: %.2f' % p1,
-            'rnn: %s (%.2f)' % (self.db.vocab.rev(rnn_argmax), rnn_result_t[rnn_argmax]),
-            'db: %s (%.2f)' % (self.db.vocab.rev(db_argmax), db_result_t[db_argmax]),
+            'gen: %s' % self.vocab.rev(y_t_argmax),
+            " ".join(atts),
+            'att_sw: %s' % y_t_aux['alpha'],
+            'rnn: %s (%.2f)' % (self.vocab.rev(rnn_argmax), rnn_result_t[rnn_argmax]),
+            " ".join(db_results),
         )
 
     def print_step(self, t, *args):
@@ -214,8 +283,8 @@ class NTON(ParametrizedBlock):
         return res
 
     def prepare_data_signle(self, (q, a)):
-        x_q = self.db.words_to_ids(q)
-        x_a = self.db.words_to_ids(a)
+        x_q = self.vocab.words_to_ids(q)
+        x_a = self.vocab.words_to_ids(a)
 
         return (x_q, x_a)
 
@@ -264,31 +333,35 @@ def plot(losses, eval_index, (train_wers, train_accs), (test_wers, test_accs), p
 
 def main(**kwargs):
     eval_step = kwargs.pop('eval_step')
-    np.set_printoptions(edgeitems=3,infstr='inf',
-                        linewidth=200, nanstr='nan', precision=4,
-                        suppress=False, threshold=1000, formatter={'float': lambda x: "%.1f" % x})
-    calc = DataCalc2(max_num=10)
-    data_train = calc.gen_data(test_data=False)
-    data_test = calc.gen_data(test_data=True)
+    # np.set_printoptions(edgeitems=3,infstr='inf',
+    #                     linewidth=200, nanstr='nan', precision=4,
+    #                     suppress=False, threshold=1000, formatter={'float': lambda x: "%.1f" % x})
+    cam_info = DataCamInfo()
+    data_train = cam_info.gen_data(test_data=False)
+    data_test = cam_info.gen_data(test_data=True)
 
-    db = DB2(calc.get_db(), calc.get_vocab())
-    db.vocab.freeze()
+    dbs = {}
+    for field in cam_info.fields:
+        db = DBN(cam_info.get_db_for(cam_info.fields, field), cam_info.get_vocab())
+        db.vocab.freeze()
 
-    #q = db.get_vector('1+3')
-    #a = db.vocab.rev(db.forward((q, ))[0][0].argmax())
-    #print a
-    emb = OneHot(n_tokens=len(db.vocab))
+        dbs[field] = db
+
+    assert len(dbs['food'].vocab) == len(dbs['area'].vocab)
+    vocab = dbs['food'].vocab
+    emb = OneHot(n_tokens=len(vocab))
 
     nton = NTON(
-        n_tokens=len(db.vocab),
-        db=db,
+        n_tokens=len(vocab),
+        dbs=dbs,
         emb=emb,
+        vocab=vocab,
         **kwargs
     )
 
     update_rule = Adam(nton.params, nton.grads)
 
-    eval_nton(nton, emb, db, 'prep_test', data_test, 1)
+    eval_nton(nton, emb, vocab, 'prep_test', data_test, 1)
 
     # data_train = [
     #     ("i would like chinese food", "ok chong is good"),
@@ -314,6 +387,7 @@ def main(**kwargs):
         ((symbol_dec, ), _) = emb.forward(([db.vocab['[EOS]']], ))
         symbol_dec = symbol_dec[0]
 
+        nton.max_gen = len(x_a)
         ((Y, y), aux) = nton.forward((x_q_emb, symbol_dec))
         ((loss, ), loss_aux) = SeqLoss.forward((Y, np.array(list(x_a) + [-1] * (len(y) - len(x_a))), ))
         (dY, ) = SeqLoss.backward(loss_aux, 1.0)
@@ -355,17 +429,18 @@ def main(**kwargs):
             plot(losses, eval_index, (train_wers, train_accs), (test_wers, test_accs), 'lcurve.png')
 
 
-def eval_nton(nton, emb, db, data_label, data, n_examples):
+def eval_nton(nton, emb, vocab, data_label, data, n_examples):
     print '### Evaluation(%s): ' % data_label
     wers = []
     acc = []
     for i in xrange(n_examples):
         x_q, x_a = nton.prepare_data_signle(next(data))
+
         ((x_q_emb, ), _) = emb.forward((x_q, ))
-        ((symbol_dec, ), _) = emb.forward(([db.vocab['[EOS]']], ))
+        ((symbol_dec, ), _) = emb.forward(([vocab['[EOS]']], ))
         symbol_dec = symbol_dec[0]
-        print "Q:", " ".join([db.vocab.rev(x) for x in x_q])
-        print "A:", " ".join([db.vocab.rev(x) for x in x_a])
+        print "Q:", " ".join([vocab.rev(x) for x in x_q])
+        print "A:", " ".join([vocab.rev(x) for x in x_a])
         ((Y, y), aux) = nton.forward((x_q_emb, symbol_dec))
 
         if 0 in y:
@@ -386,6 +461,9 @@ def eval_nton(nton, emb, db, data_label, data, n_examples):
 if __name__ == '__main__':
     random.seed(0)
     np.random.seed(0)
+    from util import pdb_on_error
+    pdb_on_error()
+
     import argparse
 
     parser = argparse.ArgumentParser()

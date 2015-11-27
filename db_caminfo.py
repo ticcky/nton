@@ -25,13 +25,6 @@ class DBCamInfo(Block):
 
         self.map = dict(self.map)
 
-    def words_to_ids(self, words):
-        res = []
-        for word in words:
-            res.append(self.vocab.add(word))
-
-        return np.array(res)
-
     def get_vector(self, *words):
         res = np.zeros((len(self.vocab), ))
 

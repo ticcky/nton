@@ -8,6 +8,7 @@ from nn.utils import timeit
 
 
 class DBN(Block):
+    item_pattern = 'item%.2d'
     def __init__(self, content, vocab):
         self.content = content
 
@@ -24,7 +25,7 @@ class DBN(Block):
 
         for key, result in self.content:
             key_tuple = tuple(self.vocab[x] for x in key)
-            key_ndx = "item%.2d" % index_cntr[key_tuple]
+            key_ndx = DBN.item_pattern % index_cntr[key_tuple]
             self.vocab.add(key_ndx)
             self.map[self.vocab[result]].append(key_tuple + (self.vocab[key_ndx],))
             index_cntr[key_tuple] += 1
@@ -42,6 +43,14 @@ class DBN(Block):
         for w in words:
             q_id = self.vocab[w]
             res[q_id] = 1.0
+
+        return res
+
+    @staticmethod
+    def get_1hot_from(word, vocab):
+        res = np.zeros((len(vocab), ))
+        word_id = vocab[word]
+        res[word_id] = 1
 
         return res
 
@@ -94,7 +103,11 @@ class DBN(Block):
                         inp_total *= x_k[x_kdim]
 
                     for z, (x_k, dx_k, x_kdim) in enumerate(zip(db_input, ddb_input, dims)):
-                        dx_k[x_kdim] += dy_i * inp_total / x_k[x_kdim]
+                        if x_k[x_kdim] > 0:
+                            denom = x_k[x_kdim]
+                        else:
+                            denom = 1.0
+                        dx_k[x_kdim] += dy_i * inp_total / denom
 
 
 
