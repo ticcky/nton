@@ -1,4 +1,6 @@
 import unittest
+import numpy as np
+import random
 
 from data_caminfo import DataCamInfo
 
@@ -19,7 +21,13 @@ class TestDataCaminfo(unittest.TestCase):
             self.assertTrue(q != '')
             self.assertTrue(a != '')
 
+            print " ".join(q)
+            print " ".join(a)
+            print
+
 
 
 if __name__ == '__main__':
+    np.random.seed(0)
+    random.seed(0)
     unittest.main()

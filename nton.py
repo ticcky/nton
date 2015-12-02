@@ -18,6 +18,8 @@ from seq_loss import SeqLoss
 from data_caminfo import DataCamInfo
 import metrics
 
+from util import hplot
+
 
 class NTON(ParametrizedBlock):
     def __init__(self, n_tokens, n_cells, dbs, emb, vocab, max_gen=10):
@@ -29,6 +31,10 @@ class NTON(ParametrizedBlock):
         self.dbs_keys, self.dbs = zip(*dbs.iteritems())
 
         self.n_dbs = len(dbs)
+        self.db_key_len = 4
+        for db in dbs.values():
+            assert db.n == self.db_key_len
+
         self.emb = emb
 
         n_ndx = 5
@@ -46,7 +52,7 @@ class NTON(ParametrizedBlock):
         self.att_switch = Attention(n_hidden=n_cells)
 
         self.atts = []
-        for i in range(self.n_dbs):
+        for i in range(self.db_key_len - 1):
             self.atts.append(Attention(n_hidden=n_cells))
 
         self.att_ndx = Attention(n_hidden=n_cells)
@@ -206,7 +212,7 @@ class NTON(ParametrizedBlock):
 
         atts = []
         for qaux in queries_t_aux:
-            atts.append("att: %s" % qaux['alpha'])
+            atts.append("att: %s" % hplot(qaux['alpha']))
 
         db_results = []
         for db_res in db_results_t:
@@ -219,7 +225,7 @@ class NTON(ParametrizedBlock):
             '  ',
             'gen: %s' % self.vocab.rev(y_t_argmax),
             " ".join(atts),
-            'att_sw: %s' % y_t_aux['alpha'],
+            'att_sw: %s' % hplot(y_t_aux['alpha'], 1.0),
             'rnn: %s (%.2f)' % (self.vocab.rev(rnn_argmax), rnn_result_t[rnn_argmax]),
             " ".join(db_results),
         )
@@ -349,7 +355,7 @@ def main(**kwargs):
 
     dbs = {}
     for field in cam_info.fields:
-        db = DBN(cam_info.get_db_for(cam_info.fields, field), cam_info.get_vocab())
+        db = DBN(cam_info.get_db_for(cam_info.query_fields, field), cam_info.get_vocab())
         db.vocab.freeze()
 
         dbs[field] = db

@@ -992,14 +992,72 @@ content = [
     }
 ]
 
+content_small = [
+    {
+        "phone": "01223 461661",
+        "pricerange": "expensive",
+        "addr": "31 newnham road newnham",
+        "area": "west",
+        "food": "indian",
+        "postcode": "not available",
+        "name": "india house"
+    },
+    {
+        "addr": "cambridge retail park newmarket road fen ditton",
+        "area": "east",
+        "food": "italian",
+        "phone": "01223 323737",
+        "pricerange": "moderate",
+        "postcode": "c.b 5",
+        "name": "italia house"
+    },
+    {
+        "name": "michaelhouse cafe",
+        "area": "centre",
+        "food": "european",
+        "phone": "01223 309147",
+        "pricerange": "cheap",
+        "postcode": "c.b 2",
+        "addr": "st. michael's church trinity street city centre"
+    },
+    {
+        "phone": "01223 461661",
+        "pricerange": "cheap",
+        "addr": "31 newnham road newnham",
+        "area": "west",
+        "food": "indian",
+        "postcode": "not available",
+        "name": "india2 house"
+    },
+    {
+        "addr": "cambridge retail park newmarket road fen ditton",
+        "area": "north",
+        "food": "italian",
+        "phone": "01223 323737",
+        "pricerange": "moderate",
+        "postcode": "c.b 5",
+        "name": "italia2 house"
+    },
+    {
+        "name": "michaelhouse2 cafe",
+        "area": "east",
+        "food": "european",
+        "phone": "01223 309147",
+        "pricerange": "cheap",
+        "postcode": "c.b 2",
+        "addr": "st. michael's church trinity street city centre"
+    }
+]
 
-train_vocab = [u'#african', u'#ali_baba', u'#anatolia', u'#backstreet_bistro', u'#bangkok_city', u'#bedouin', u'#bloomsbury_restaurant', u'#british', u'#caffe_uno', u'#cambridge_lodge_restaurant', u'#centre', u'#cheap', u'#chinese', u'#chiquito_restaurant_bar', u'#cote', u'#curry_prince', u'#da_vinci_pizzeria', u'#dojo_noodle_bar', u'#east', u'#eraina', u'#european', u'#expensive', u'#french', u'#gastropub', u'#golden_wok', u'#grafton_hotel_restaurant', u'#hakka', u'#hotel_du_vin_and_bistro', u'#indian', u'#international', u'#italian', u'#japanese', u'#jinling_noodle_bar', u'#kohinoor', u'#korean', u'#la_margherita', u'#la_raza', u'#la_tasca', u'#lebanese', u'#little_seoul', u'#loch_fyne', u'#mahal_of_cambridge', u'#maharajah_tandoori_restaurant', u'#mediterranean', u'#meghna', u'#mexican', u'#meze_bar_restaurant', u'#michaelhouse_cafe', u'#moderate', u'#moderately', u'#nandos', u'#nandos_city_centre', u'#north', u'#peking_restaurant', u'#pipasha_restaurant', u'#pizza_hut_cherry_hinton', u'#pizza_hut_city_centre', u'#pizza_hut_fen_ditton', u'#portuguese', u'#prezzo', u'#rajmahal', u'#restaurant_alimentum', u'#restaurant_two_two', u'#royal_spice', u'#saint_johns_chop_house', u'#sala_thong', u'#seafood', u'#shiraz_restaurant', u'#south', u'#spanish', u'#thai', u'#thanh_binh', u'#the_cow_pizza_kitchen_and_bar', u'#the_gandhi', u'#the_gardenia', u'#the_lucky_star', u'#the_missing_sock', u'#the_nirala', u'#the_river_bar_steakhouse_and_grill', u'#the_varsity_restaurant', u'#turkish', u'#vietnamese', u'#wagamama', u'#west', u'#yu_garden', u',', u'.', u'7:30', u'?', u'a', u'about', u'address', u'af', u'afghan', u'afternoon', u'ah', u'air', u'airitran', u'am', u'an', u'and', u'any', u'anything', u'are', u'area', u'art', u'arts', u'asian', u'at', u'australasian', u'australian', u'austrian', u'b#ask', u'b#askaye', u'barbecue', u'barbeque', u'basque', u'bat', u'be', u'belgian', u'belgium', u'bistro', u'brazilian', u'breath', u'breathing', u'but', u'bye', u'caius', u'cambridge', u'can', u"can't", u'canape', u'canapes', u'cancun', u'cannabis', u'canope', u'cant', u'cantonese', u'care', u'caribbean', u'catalan', u'center', u'central', u'christmas', u'city', u'code', u'college', u'confirm', u'corsica', u'cough', u'could', u'creative', u'cross', u'crossover', u'cuban', u'danish', u'darling', u'did', u'do', u'dont', u'eat', u'endonesian', u'english', u'eritrean', u'euro', u'europ', u'f', u'fancy', u'ffood', u'find', u'food', u'for', u'fusion', u'gastro', u'german', u'get', u'gonville', u'good', u'goodbye', u'great', u'greek', u'halal', u'halo', u'has', u'have', u'hear', u'hello', u'hi', u'house', u'how', u'hungarian', u'i', u'iam', u'id', u'if', u'im', u'in', u'inaudible', u'indonesian', u'irish', u'is', u'it', u'jamaican', u'just', u'kind', u'ko', u'kosher', u'let', u'lets', u'like', u'looking', u'malaysian', u'matches', u'may', u'me', u'medetanian', u'mediteranian', u'mind', u'modereate', u'modertley', u'modreately', u'moment', u'more', u'moroccan', u'much', u'music', u'need', u'needs', u'new', u'nice', u'no', u'noise', u'number', u'of', u'oh', u'ok', u'okay', u'on', u'or', u'ostro', u'over', u'p', u'pan', u'panasian', u'park', u'part', u'persian', u'phone', u'place', u'please', u'polish', u'polynesian', u'postal', u'pri', u'price', u'priced', u'prices', u'pub', u'range', u'really', u'request', u'rerestaurant', u'rest', u'restaraunt', u'restaurant', u'restaurants', u'restaurnt', u'right', u'ring', u'romanian', u'russian', u'say', u'scandinavia', u'scandinavian', u'scotch', u'scottish', u'sea', u'searching', u'see', u'sells', u'ser', u'serve', u'serves', u'serving', u'should', u'side', u'sigh', u'signaporean', u'singaporean', u'so', u'some', u'something', u'sorry', u'sorry,', u'special', u'spensive', u'static', u'steak', u'steakhouse', u'swedish', u'swiss', u'system', u't', u'tasty', u'tell', u'thank', u'that', u'thats', u'the', u'there', u'theres', u'time', u'to', u'town', u'traditional', u'tran', u'trying', u'tur', u'turk', u'turkiesh', u'tuscan', u'type', u'uh', u'um', u'un', u'unintelligible', u'unusual', u'vanessa', u'vegetarian', u'venetian', u'vietna', u'wait', u'wanna', u'want', u'we', u'welcome', u'welsh', u'what', u'whats', u'with', u'wondering', u'world', u'would', u'ya', u'ye', u'yea', u'yeah', u'yes', u'york', u'you', u'your']
+
+train_vocab = [u'#african', u'#ali_baba', u'#anatolia', u'#backstreet_bistro', u'#bangkok_city', u'#bedouin', u'#bloomsbury_restaurant', u'#british', u'#caffe_uno', u'#cambridge_lodge_restaurant', u'#centre', u'#cheap', u'#chinese', u'#chiquito_restaurant_bar', u'#cote', u'#curry_prince', u'#da_vinci_pizzeria', u'#dojo_noodle_bar', u'#east', u'#eraina', u'#european', u'#expensive', u'#french', u'#gastropub', u'#golden_wok', u'#grafton_hotel_restaurant', u'#hakka', u'#hotel_du_vin_and_bistro', u'#indian', u'#international', u'#italian', u'#japanese', u'#jinling_noodle_bar', u'#kohinoor', u'#korean', u'#la_margherita', u'#la_raza', u'#la_tasca', u'#lebanese', u'#little_seoul', u'#loch_fyne', u'#mahal_of_cambridge', u'#maharajah_tandoori_restaurant', u'#mediterranean', u'#meghna', u'#mexican', u'#meze_bar_restaurant', u'#michaelhouse_cafe', u'#moderate', u'#moderately', u'#nandos', u'#nandos_city_centre', u'#north', u'#peking_restaurant', u'#pipasha_restaurant', u'#pizza_hut_cherry_hinton', u'#pizza_hut_city_centre', u'#pizza_hut_fen_ditton', u'#portuguese', u'#prezzo', u'#rajmahal', u'#restaurant_alimentum', u'#restaurant_two_two', u'#royal_spice', u'#saint_johns_chop_house', u'#sala_thong', u'#seafood', u'#shiraz_restaurant', u'#south', u'#spanish', u'#thai', u'#thanh_binh', u'#the_cow_pizza_kitchen_and_bar', u'#the_gandhi', u'#the_gardenia', u'#the_lucky_star', u'#the_missing_sock', u'#the_nirala', u'#the_river_bar_steakhouse_and_grill', u'#the_varsity_restaurant', u'#turkish', u'#vietnamese', u'#wagamama', u'#west', u'#yu_garden', u',', u'.', u'7:30', u'?', u'a', u'about', u'address', u'af', u'afghan', u'afternoon', u'ah', u'air', u'airitran', u'am', u'an', u'and', u'any', u'anything', u'are', u'area', u'art', u'arts', u'asian', u'at', u'australasian', u'australian', u'austrian', u'b#ask', u'b#askaye', u'barbecue', u'barbeque', u'basque', u'bat', u'be', u'belgian', u'belgium', u'bistro', u'brazilian', u'breath', u'breathing', u'but', u'bye', u'caius', u'cambridge', u'can', u"can't", u'canape', u'canapes', u'cancun', u'cannabis', u'canope', u'cant', u'cantonese', u'care', u'caribbean', u'catalan', u'center', u'central', u'christmas', u'city', u'code', u'college', u'confirm', u'corsica', u'cough', u'could', u'creative', u'cross', u'crossover', u'cuban', u'danish', u'darling', u'did', u'do', u'dont', u'eat', u'endonesian', u'english', u'eritrean', u'euro', u'europ', u'f', u'fancy', u'ffood', u'find', u'food', u'for', u'fusion', u'gastro', u'german', u'get', u'gonville', u'good', u'goodbye', u'great', u'greek', u'halal', u'halo', u'has', u'have', u'hear', u'hello', u'hi', u'house', u'how', u'hungarian', u'i', u'iam', u'id', u'if', u'im', u'in', u'inaudible', u'indonesian', u'irish', u'is', u'it', u'jamaican', u'just', u'kind', u'ko', u'kosher', u'let', u'lets', u'like', u'looking', u'malaysian', u'matches', u'may', u'me', u'medetanian', u'mediteranian', u'mind', u'modereate', u'modertley', u'modreately', u'moment', u'more', u'moroccan', u'much', u'music', u'need', u'needs', u'new', u'nice', u'no', u'noise', u'number', u'of', u'oh', u'ok', u'okay', u'on', u'or', u'ostro', u'over', u'p', u'pan', u'panasian', u'park', u'part', u'persian', u'phone', u'place', u'please', u'polish', u'polynesian', u'postal', u'pri', u'price', u'priced', u'prices', u'pub', u'range', u'really', u'request', u'rerestaurant', u'rest', u'restaraunt', u'restaurant', u'restaurants', u'restaurnt', u'right', u'ring', u'romanian', u'russian', u'say', u'scandinavia', u'scandinavian', u'scotch', u'scottish', u'sea', u'searching', u'see', u'sells', u'ser', u'serve', u'serves', u'serving', u'should', u'side', u'sigh', u'signaporean', u'singaporean', u'so', u'some', u'something', u'sorry', u'sorry,', u'special', u'spensive', u'static', u'steak', u'steakhouse', u'swedish', u'swiss', u'system', u't', u'tasty', u'tell', u'thank', u'that', u'thats', u'the', u'there', u'theres', u'time', u'to', u'town', u'traditional', u'tran', u'trying', u'tur', u'turk', u'turkiesh', u'tuscan', u'type', u'uh', u'um', u'un', u'unintelligible', u'unusual', u'vanessa', u'vegetarian', u'venetian', u'vietna', u'wait', u'wanna', u'want', u'we', u'welcome', u'welsh', u'what', u'whats', u'with', u'wondering', u'world', u'would', u'ya', u'ye', u'yea', u'yeah', u'yes', u'york', u'you', u'your', 'not', 'bad', 'give']
 
 
 
 class DataCamInfo(object):
-    db_content = content
+    db_content = content_small
     fields = ["name", "area", "food", "phone", "pricerange", "postcode", "addr"]
+    query_fields = ["area", "food", "pricerange"]
 
     def __init__(self):
         self.vocab = set()
@@ -1014,16 +1072,18 @@ class DataCamInfo(object):
             t_entry = []
             for field in self.fields:
                 word = entry[field]
-                self.vocab.add(word)
-                self.re_vocab_map[re.escape(word)] = "#" + word.replace(' ', '_')
+                word_tgt = self.get_tagged_value(word)
+                self.vocab.add(word_tgt)
+                self.re_vocab_map[re.escape(word)] = word_tgt
                 t_entry.append(word)
 
             self.content.append(tuple(t_entry))
 
         for slot, values in data_dstc2.ontology.iteritems():
             for value in values:
-                self.re_vocab_map[re.escape(word)] = "#" + word.replace(' ', '_')
-
+                word_tgt = self.get_tagged_value(value)
+                self.vocab.add(word_tgt)
+                self.re_vocab_map[re.escape(value)] = word_tgt
 
         self.vocab = list(sorted(self.vocab))
 
@@ -1032,6 +1092,9 @@ class DataCamInfo(object):
         self.re_vocab_map[re.escape("sil")] = ""
         self.re_vocab_map[re.escape("silence")] = ""
         self.re_vocab_repl = re.compile("|".join(self.re_vocab_map.keys()))
+
+    def get_tagged_value(self, word):
+        return "#" + word.replace(' ', '_')
 
     def get_vocab(self):
         return self.vocab
@@ -1042,8 +1105,8 @@ class DataCamInfo(object):
     def get_db_for(self, ins, out):
         res = []
         for entry in self.db_content:
-            key = tuple(entry[x] for x in ins)
-            val = entry[out]
+            key = tuple(self.get_tagged_value(entry[x]) for x in ins)
+            val = self.get_tagged_value(entry[out])
 
             #res.append((key, val, ))
 
@@ -1060,7 +1123,7 @@ class DataCamInfo(object):
         return res
 
 
-    def gen_data(self, test_data=False, single_pass=False):
+    def gen_data_full(self, test_data=False, single_pass=False):
         data_dir = config.dstc_data_path
         input_dir = os.path.join(data_dir, 'dstc2/data')
         if test_data:
@@ -1075,6 +1138,7 @@ class DataCamInfo(object):
 
         while dialogs:
             dialog_dir = random.choice(dialogs)
+            print dialog_dir
             if single_pass:
                 dialogs.remove(dialog_dir)
 
@@ -1082,7 +1146,8 @@ class DataCamInfo(object):
                 res = cache[dialog_dir]
             else:
                 dialog = data_dstc2.parse_dialog_from_directory(dialog_dir)
-                user = dialog.turns[0].transcription
+                #user = dialog.turns[0].transcription
+                user = dialog.turns[0].input.live_asr[0].hyp
                 system = dialog.turns[1].output.transcript
 
                 user = self._replace_entities(user)
@@ -1095,6 +1160,32 @@ class DataCamInfo(object):
             if len(res[0]) != 0:
                 yield res
 
+    def gen_data(self, test_data=False, single_pass=False):
+        dialogs_train = [
+            ('i want expensive indian in the west', 'india house is not bad'),
+            ('how about something east that serves moderate italian food', 'italia house is not bad'),
+            ('could you give me cheap centre european food', 'michaelhouse cafe is not bad')
+        ]
+
+        dialogs_test = [
+            ('looking for cheap place serving indian food located in the west', 'india2 house is not bad'),
+            ('give me something north serving italian food in moderate pricerange', 'italia2 house is not bad'),
+            ('cheap east european', 'michaelhouse2 cafe is not bad')
+        ]
+
+        if test_data:
+            dialogs = dialogs_test
+        else:
+            dialogs = dialogs_train
+
+        while True:
+            user, system = random.choice(dialogs)
+
+            user = self._replace_entities(user)
+            system = self._replace_entities(system)
+
+            yield (user.split(), system.split())
+
 
     def _replace_entities(self, where):
         where = where.lower()
@@ -1106,10 +1197,13 @@ def main():
     vocab = set()
     db = DataCamInfo()
     for x in db.gen_data(single_pass=True):
-        for i in x:
-            map(vocab.add, i.split())
+        print " ".join(x[0]), "\t",  "A:", " ".join(x[1])
 
-    print list(sorted(vocab))
+
+        #for i in x:
+        #    map(vocab.add, i.split())
+
+    #print list(sorted(vocab))
     #print len(db.get_vocab())
     #print db.get_db()
 

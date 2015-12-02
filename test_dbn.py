@@ -27,7 +27,7 @@ class TestDBN(unittest.TestCase):
                     db.get_vector('item%.2d' % i),
                 )
                 ((db_res, ), _) = db.forward(db_input)
-
+                import ipdb; ipdb.set_trace()
 
                 matching = set(e['name'] for e in db_data.db_content if e['area'] == entry['area'] and e['food'] == entry['food'] and e['pricerange'] == entry['pricerange'] and e)
                 returned = list(db.vocab.rev(i) for i in np.where(db_res == 1)[0])
