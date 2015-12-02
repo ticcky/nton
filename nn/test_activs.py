@@ -1,7 +1,7 @@
 from unittest import TestCase, main
 import numpy as np
 
-from nn.activs import Tanh, Sigmoid
+from nn.activs import Tanh, Sigmoid, ReLU
 from nn.utils import check_finite_differences
 
 
@@ -37,6 +37,25 @@ class TestSigmoid(TestCase):
             check_finite_differences(
                 Sigmoid.forward,
                 Sigmoid.backward,
+                gen_input_fn=lambda: (np.random.randn(7, 3), ),
+                aux_only=True
+            )
+        )
+
+
+class TestReLU(TestCase):
+    def test_forward(self):
+        x = np.array([[1, -1, -10], [0, 1, 20]])
+        ((res, ), aux, ) = ReLU.forward((x, ))
+
+        self.assertTrue(np.allclose(res, [[1, 0, 0], [0, 1, 20]]))
+
+
+    def test_backward(self):
+        self.assertTrue(
+            check_finite_differences(
+                ReLU.forward,
+                ReLU.backward,
                 gen_input_fn=lambda: (np.random.randn(7, 3), ),
                 aux_only=True
             )

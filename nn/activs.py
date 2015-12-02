@@ -38,3 +38,22 @@ class Sigmoid(Block):
         res = y * (1 - y) * dy
 
         return (res, )
+
+class ReLU(Block):
+    @classmethod
+    def forward(self, (x, )):
+        y = (x > 0) * x
+
+        aux = Vars(
+            y=y
+        )
+
+        return ((y, ), aux)
+
+    @classmethod
+    def backward(self, aux, (dy, )):
+        y = aux['y']
+
+        res = (y > 0) * dy
+
+        return (res, )
