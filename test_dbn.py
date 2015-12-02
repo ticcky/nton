@@ -15,21 +15,19 @@ class TestDBN(unittest.TestCase):
 
         db = DBN(db_content, vocab)
 
-        any = db.get_vector('0') * 0 + 1
+        #any = db.get_vector('0') * 0 + 1
 
         for entry in db_data.db_content:
             empty_result = False
             for i in range(5):
                 db_input = (
-                    db.get_vector(entry['area']),
-                    db.get_vector(entry['food']),
-                    db.get_vector(entry['pricerange']),
-                    db.get_vector('item%.2d' % i),
+                    db.get_vector(db_data.get_tagged_value(entry['area'])),
+                    db.get_vector(db_data.get_tagged_value(entry['food'])),
+                    db.get_vector(db_data.get_tagged_value(entry['pricerange'])),
                 )
                 ((db_res, ), _) = db.forward(db_input)
-                import ipdb; ipdb.set_trace()
 
-                matching = set(e['name'] for e in db_data.db_content if e['area'] == entry['area'] and e['food'] == entry['food'] and e['pricerange'] == entry['pricerange'] and e)
+                matching = set(db_data.get_tagged_value(e['name']) for e in db_data.db_content if e['area'] == entry['area'] and e['food'] == entry['food'] and e['pricerange'] == entry['pricerange'] and e)
                 returned = list(db.vocab.rev(i) for i in np.where(db_res == 1)[0])
 
                 if returned:
@@ -37,6 +35,8 @@ class TestDBN(unittest.TestCase):
                     self.assertTrue(returned[0] in matching)
                 else:
                     empty_result = True
+
+            self.assertFalse(empty_result)
 
         def gen_input():
             res = []
@@ -53,8 +53,11 @@ class TestDBN(unittest.TestCase):
             aux_only=True
         )
 
+
+
         self.assertTrue(check)
 
 
 if __name__ == '__main__':
+    np.random.seed(0)
     unittest.main()
