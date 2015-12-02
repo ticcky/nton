@@ -50,7 +50,6 @@ class TestReLU(TestCase):
 
         self.assertTrue(np.allclose(res, [[1, 0, 0], [0, 1, 20]]))
 
-
     def test_backward(self):
         self.assertTrue(
             check_finite_differences(
@@ -60,8 +59,6 @@ class TestReLU(TestCase):
                 aux_only=True
             )
         )
-
-
 
 
 if __name__ == '__main__':

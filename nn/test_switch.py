@@ -12,7 +12,7 @@ class TestSwitch(TestCase):
         in1 = np.random.randn(13)
         in2 = np.random.randn(13)
 
-        ((out, ), aux) = Switch.forward((p1, in1, in2))
+        ((out, ), aux) = Switch.forward((np.array([p1, 1 - p1]), in1, in2))
         self.assertEqual(out.shape, (13, ))
 
     def test_backward(self):
@@ -21,7 +21,7 @@ class TestSwitch(TestCase):
             in1 = np.random.randn(100)
             in2 = np.random.randn(100)
 
-            return (p1, in1, in2, )
+            return (np.array([p1, 1 - p1]), in1, in2, )
 
         check = check_finite_differences(
             Switch.forward,

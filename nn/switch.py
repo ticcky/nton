@@ -9,27 +9,36 @@ from linear import Dot
 
 class Switch(Block):
     @classmethod
-    def forward(self, (p1, in1, in2)):
-        res = p1 * in1 + (1 - p1) * in2
+    def forward(self, inp):
+        assert type(inp) == tuple
+
+        p = inp[0]
+        ins = inp[1:]
+
+        assert len(p) == len(ins)
+
+        res = np.zeros_like(ins[0])
+        for p_i, ins_i in zip(p, ins):
+            res += p_i * ins_i
 
         aux = Vars(
-            p1=p1,
-            in1=in1,
-            in2=in2
+            p=p,
+            ins=ins
         )
 
         return ((res, ), aux)
 
     @classmethod
     def backward(self, aux, (dres, )):
-        p1 = aux['p1']
-        in1 = aux['in1']
-        in2 = aux['in2']
+        p = aux['p']
+        ins = aux['ins']
 
-        din1 = p1 * dres
-        din2 = (1 - p1) * dres
+        dins = []
+        for p_i in p:
+            dins.append(p_i * dres)
 
-        dp1 = np.dot(dres, in1)
-        dp1 -= np.dot(dres, in2)
+        dp = np.zeros_like(p)
+        for i, ins_i in enumerate(ins):
+            dp[i] = np.dot(dres, ins_i)
 
-        return (np.array([dp1]), din1, din2)
+        return (dp, ) + tuple(dins)
