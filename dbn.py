@@ -70,7 +70,7 @@ class DBN(Block):
         vals = {}
 
         assert type(db_input) == tuple
-        assert len(db_input) == self.n
+        assert len(db_input) == self.n, 'db_input: %d, n: %d' % (len(db_input), self.n, )
         for x in db_input:
             assert len(res) == len(x)
 

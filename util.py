@@ -194,7 +194,7 @@ def hplot(arr, max_arr=None):
 
 
 def visual(val, max_val):
-    if abs(val) == max_val:
+    if abs(val) >= max_val:
         step = len(bar_chars) - 1
     else:
         step = int(abs(float(val) / max_val) * len(bar_chars))

@@ -1,5 +1,6 @@
 import numpy as np
 import random
+import string
 import os
 import re
 import itertools
@@ -1055,15 +1056,15 @@ train_vocab = [u'#african', u'#ali_baba', u'#anatolia', u'#backstreet_bistro', u
 
 
 class DataCamInfo(object):
-    db_content = content_small
+    db_content = content
     fields = ["name", "area", "food", "phone", "pricerange", "postcode", "addr"]
     query_fields = ["area", "food", "pricerange"]
 
     def __init__(self):
         self.vocab = set()
         for i in range(10):
-            self.vocab.add(str(i))
-            self.vocab.add("item%.2d" % i)
+            #self.vocab.add(str(i))
+            self.vocab.add(self.get_tagged_value("item%.2d" % i))
         for word in train_vocab:
             self.vocab.add(word)
         self.re_vocab_map = {}
@@ -1123,7 +1124,7 @@ class DataCamInfo(object):
         return res
 
 
-    def gen_data_full(self, test_data=False, single_pass=False):
+    def gen_data(self, test_data=False, single_pass=False):
         data_dir = config.dstc_data_path
         input_dir = os.path.join(data_dir, 'dstc2/data')
         if test_data:
@@ -1138,7 +1139,7 @@ class DataCamInfo(object):
 
         while dialogs:
             dialog_dir = random.choice(dialogs)
-            print dialog_dir
+
             if single_pass:
                 dialogs.remove(dialog_dir)
 
@@ -1146,40 +1147,63 @@ class DataCamInfo(object):
                 res = cache[dialog_dir]
             else:
                 dialog = data_dstc2.parse_dialog_from_directory(dialog_dir)
+
+                # system = ""
+                # user_utt_lst = []
+                # for turn in dialog.turns:
+                #     user_utt_lst.append(turn.transcription)
+                #     for da in turn.output.dialog_acts:
+                #         if da.act == 'offer':
+                #             system = turn.output.transcript
+                #             break
+                #
+                #     if system:
+                #         break
                 #user = dialog.turns[0].transcription
                 user = dialog.turns[0].input.live_asr[0].hyp
+                #user = " ".join(user_utt_lst)
                 system = dialog.turns[1].output.transcript
 
                 user = self._replace_entities(user)
                 system = self._replace_entities(system)
 
+                #print user
+                #print system
+                #print
+
                 res = (tuple(user.split()), tuple(system.split()))
 
                 cache[dialog_dir] = res
 
-            if len(res[0]) != 0:
+            if len(res[0]) != 0 and len(res[1]) != 0:
                 yield res
 
-    def gen_data(self, test_data=False, single_pass=False):
-        dialogs_train = [
-            ('i want expensive indian in the west', 'india house is not bad'),
-            ('how about something east that serves moderate italian food', 'italia house is not bad'),
-            ('could you give me cheap centre european food', 'michaelhouse cafe is not bad')
+    def gen_data_x(self, test_data=False, single_pass=False):
+        train_tpls = [
+            ('i want {pricerange} {food} in the {area}', '{name} is not bad'),
+            ('how about something {area} that serves {pricerange} {food} food', '{name} is not bad'),
+            ('could you give me {pricerange} {area} {food} food', '{name} is not bad')
         ]
 
-        dialogs_test = [
-            ('looking for cheap place serving indian food located in the west', 'india2 house is not bad'),
-            ('give me something north serving italian food in moderate pricerange', 'italia2 house is not bad'),
-            ('cheap east european', 'michaelhouse2 cafe is not bad')
+        test_tpls = [
+            ('looking for {pricerange} place serving {food} food located in the {area}', '{name} is not bad'),
+            ('give me something {area} serving {food} food in {pricerange} pricerange', '{name} is not bad'),
+            ('{pricerange} {area} {food}', '{name} is not bad')
         ]
 
         if test_data:
-            dialogs = dialogs_test
+            tpls = test_tpls
+            db = self.db_content[:25]
         else:
-            dialogs = dialogs_train
+            tpls = train_tpls
+            db = self.db_content[25:]
 
         while True:
-            user, system = random.choice(dialogs)
+            user, system = random.choice(tpls)
+
+            entry = random.choice(db)
+            user = str.format(user, **entry)
+            system = str.format(system, **entry)
 
             user = self._replace_entities(user)
             system = self._replace_entities(system)
