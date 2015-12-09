@@ -1150,28 +1150,20 @@ class DataCamInfo(object):
 
                 # system = ""
                 # user_utt_lst = []
-                # for turn in dialog.turns:
-                #     user_utt_lst.append(turn.transcription)
-                #     for da in turn.output.dialog_acts:
-                #         if da.act == 'offer':
-                #             system = turn.output.transcript
-                #             break
-                #
-                #     if system:
-                #         break
-                #user = dialog.turns[0].transcription
-                user = dialog.turns[0].input.live_asr[0].hyp
-                #user = " ".join(user_utt_lst)
-                system = dialog.turns[1].output.transcript
+                res = []
 
-                user = self._replace_entities(user)
-                system = self._replace_entities(system)
+                for turn in dialog.turns:
+                    system = turn.output.transcript
+                    user = turn.transcription
 
-                #print user
-                #print system
-                #print
+                    system = self._replace_entities(system)
+                    user = self._replace_entities(user)
 
-                res = (tuple(user.split()), tuple(system.split()))
+                    res.append((system, user, ))
+
+
+
+                res = tuple(res)
 
                 cache[dialog_dir] = res
 

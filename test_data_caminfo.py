@@ -17,13 +17,18 @@ class TestDataCaminfo(unittest.TestCase):
         vocab = db.get_vocab()
         data = db.gen_data()
         for i in range(10):
-            q, a = next(data)
-            self.assertTrue(q != '')
-            self.assertTrue(a != '')
+            dialog = next(data)
 
-            print " ".join(q)
-            print " ".join(a)
-            print
+            for sys, usr in dialog:
+                self.assertTrue(len(sys.strip()) != 0)
+                self.assertTrue(len(usr.strip()) != 0)
+
+            #self.assertTrue(q != '')
+            #self.assertTrue(a != '')
+
+            #print " ".join(q)
+            #print " ".join(a)
+            #print
 
 
 
