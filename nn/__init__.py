@@ -7,3 +7,4 @@ from embeddings import *
 from sequential import *
 from activs import *
 from update_rule import *
+from attention import *

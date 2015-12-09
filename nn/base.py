@@ -1,7 +1,11 @@
 from vars import Vars
 
 class Block(object):
-    pass
+    def accum_grads(self, accums, grads):
+        assert len(grads) == len(accums)
+
+        for grad, accum in zip(grads, accums):
+            accum.append(grad)
 
 
 class ParametrizedBlock(Block):
