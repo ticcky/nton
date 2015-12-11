@@ -30,6 +30,8 @@ class Switch(Block):
 
     @classmethod
     def backward(self, aux, (dres, )):
+        assert type(dres) == np.ndarray
+
         p = aux['p']
         ins = aux['ins']
 

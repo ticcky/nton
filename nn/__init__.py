@@ -9,3 +9,4 @@ from activs import *
 from update_rule import *
 from attention import *
 from switch import *
+from concat import *
