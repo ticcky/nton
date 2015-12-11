@@ -5,12 +5,13 @@ class Vocab(dict):
     oov_token = '#OOV'
     eos_token = '[EOS]'
 
-    def __init__(self):
+    def __init__(self, no_oov_eos=False):
         self._rev = dict()
         self.frozen = False
 
-        self.add(self.oov_token)
-        self.add(self.eos_token)
+        if not no_oov_eos:
+            self.add(self.oov_token)
+            self.add(self.eos_token)
 
     def __iter__(self):
         for k, v in sorted(self.items(), key=lambda x: x[1]):

@@ -1050,6 +1050,9 @@ content_small = [
     }
 ]
 
+for i, entry in enumerate(content):
+    entry["id"] = i
+
 
 train_vocab = [u'#african', u'#ali_baba', u'#anatolia', u'#backstreet_bistro', u'#bangkok_city', u'#bedouin', u'#bloomsbury_restaurant', u'#british', u'#caffe_uno', u'#cambridge_lodge_restaurant', u'#centre', u'#cheap', u'#chinese', u'#chiquito_restaurant_bar', u'#cote', u'#curry_prince', u'#da_vinci_pizzeria', u'#dojo_noodle_bar', u'#east', u'#eraina', u'#european', u'#expensive', u'#french', u'#gastropub', u'#golden_wok', u'#grafton_hotel_restaurant', u'#hakka', u'#hotel_du_vin_and_bistro', u'#indian', u'#international', u'#italian', u'#japanese', u'#jinling_noodle_bar', u'#kohinoor', u'#korean', u'#la_margherita', u'#la_raza', u'#la_tasca', u'#lebanese', u'#little_seoul', u'#loch_fyne', u'#mahal_of_cambridge', u'#maharajah_tandoori_restaurant', u'#mediterranean', u'#meghna', u'#mexican', u'#meze_bar_restaurant', u'#michaelhouse_cafe', u'#moderate', u'#moderately', u'#nandos', u'#nandos_city_centre', u'#north', u'#peking_restaurant', u'#pipasha_restaurant', u'#pizza_hut_cherry_hinton', u'#pizza_hut_city_centre', u'#pizza_hut_fen_ditton', u'#portuguese', u'#prezzo', u'#rajmahal', u'#restaurant_alimentum', u'#restaurant_two_two', u'#royal_spice', u'#saint_johns_chop_house', u'#sala_thong', u'#seafood', u'#shiraz_restaurant', u'#south', u'#spanish', u'#thai', u'#thanh_binh', u'#the_cow_pizza_kitchen_and_bar', u'#the_gandhi', u'#the_gardenia', u'#the_lucky_star', u'#the_missing_sock', u'#the_nirala', u'#the_river_bar_steakhouse_and_grill', u'#the_varsity_restaurant', u'#turkish', u'#vietnamese', u'#wagamama', u'#west', u'#yu_garden', u',', u'.', u'7:30', u'?', u'a', u'about', u'address', u'af', u'afghan', u'afternoon', u'ah', u'air', u'airitran', u'am', u'an', u'and', u'any', u'anything', u'are', u'area', u'art', u'arts', u'asian', u'at', u'australasian', u'australian', u'austrian', u'b#ask', u'b#askaye', u'barbecue', u'barbeque', u'basque', u'bat', u'be', u'belgian', u'belgium', u'bistro', u'brazilian', u'breath', u'breathing', u'but', u'bye', u'caius', u'cambridge', u'can', u"can't", u'canape', u'canapes', u'cancun', u'cannabis', u'canope', u'cant', u'cantonese', u'care', u'caribbean', u'catalan', u'center', u'central', u'christmas', u'city', u'code', u'college', u'confirm', u'corsica', u'cough', u'could', u'creative', u'cross', u'crossover', u'cuban', u'danish', u'darling', u'did', u'do', u'dont', u'eat', u'endonesian', u'english', u'eritrean', u'euro', u'europ', u'f', u'fancy', u'ffood', u'find', u'food', u'for', u'fusion', u'gastro', u'german', u'get', u'gonville', u'good', u'goodbye', u'great', u'greek', u'halal', u'halo', u'has', u'have', u'hear', u'hello', u'hi', u'house', u'how', u'hungarian', u'i', u'iam', u'id', u'if', u'im', u'in', u'inaudible', u'indonesian', u'irish', u'is', u'it', u'jamaican', u'just', u'kind', u'ko', u'kosher', u'let', u'lets', u'like', u'looking', u'malaysian', u'matches', u'may', u'me', u'medetanian', u'mediteranian', u'mind', u'modereate', u'modertley', u'modreately', u'moment', u'more', u'moroccan', u'much', u'music', u'need', u'needs', u'new', u'nice', u'no', u'noise', u'number', u'of', u'oh', u'ok', u'okay', u'on', u'or', u'ostro', u'over', u'p', u'pan', u'panasian', u'park', u'part', u'persian', u'phone', u'place', u'please', u'polish', u'polynesian', u'postal', u'pri', u'price', u'priced', u'prices', u'pub', u'range', u'really', u'request', u'rerestaurant', u'rest', u'restaraunt', u'restaurant', u'restaurants', u'restaurnt', u'right', u'ring', u'romanian', u'russian', u'say', u'scandinavia', u'scandinavian', u'scotch', u'scottish', u'sea', u'searching', u'see', u'sells', u'ser', u'serve', u'serves', u'serving', u'should', u'side', u'sigh', u'signaporean', u'singaporean', u'so', u'some', u'something', u'sorry', u'sorry,', u'special', u'spensive', u'static', u'steak', u'steakhouse', u'swedish', u'swiss', u'system', u't', u'tasty', u'tell', u'thank', u'that', u'thats', u'the', u'there', u'theres', u'time', u'to', u'town', u'traditional', u'tran', u'trying', u'tur', u'turk', u'turkiesh', u'tuscan', u'type', u'uh', u'um', u'un', u'unintelligible', u'unusual', u'vanessa', u'vegetarian', u'venetian', u'vietna', u'wait', u'wanna', u'want', u'we', u'welcome', u'welsh', u'what', u'whats', u'with', u'wondering', u'world', u'would', u'ya', u'ye', u'yea', u'yeah', u'yes', u'york', u'you', u'your', 'not', 'bad', 'give']
 
@@ -1095,7 +1098,10 @@ class DataCamInfo(object):
         self.re_vocab_repl = re.compile("|".join(self.re_vocab_map.keys()))
 
     def get_tagged_value(self, word):
-        return "#" + word.replace(' ', '_')
+        if type(word) is int:
+            return word
+        else:
+            return "#" + word.replace(' ', '_')
 
     def get_vocab(self):
         return self.vocab
@@ -1118,8 +1124,6 @@ class DataCamInfo(object):
             for key_g in itertools.product(*keys):
                 res.append((key_g, val))
                 break
-
-
 
         return res
 

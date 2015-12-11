@@ -8,17 +8,18 @@ from nn.utils import timeit
 
 
 class DBDist(Block):
-    def __init__(self, content, vocab):
+    def __init__(self, content, input_vocab, output_vocab):
         self.content = content
-        self.vocab = vocab
+        self.input_vocab = input_vocab
+        self.output_vocab = output_vocab
 
         self.y_map = defaultdict(list)
         self.n = None
 
         for key, result in self.content:
-            key_tuple = tuple(self.vocab[x] for x in key)
+            key_tuple = tuple(self.input_vocab[x] for x in key)
 
-            self.y_map[result].append(key_tuple)
+            self.y_map[self.output_vocab[result]].append(key_tuple)
 
             if self.n is None:
                 self.n = len(key_tuple)
@@ -27,11 +28,14 @@ class DBDist(Block):
 
         self.y_map = dict(self.y_map)
 
+    def vocab_map_fn(self, x):
+        return self.input_vocab[x]
+
     def get_vector(self, *words):
-        res = np.zeros((len(self.vocab), ))
+        res = np.zeros((len(self.input_vocab), ))
 
         for w in words:
-            q_id = self.vocab[w]
+            q_id = self.vocab_map_fn(w)
             res[q_id] = 1.0
 
         return res
@@ -44,16 +48,9 @@ class DBDist(Block):
 
         return res
 
-    def build_p(self, u):
-        return np.dot(self.entries_a, u)
-
-    def softmax(self, x):
-        ex = np.exp(x)
-        return ex / np.sum(ex)
-
     @timeit
     def forward(self, db_input):
-        res = np.zeros((len(self.y_map), ))
+        res = np.zeros((len(self.output_vocab), ))
         vals = {}
 
         assert type(db_input) == tuple
