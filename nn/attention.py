@@ -104,4 +104,12 @@ class Attention(ParametrizedBlock):
         (dh_out, dWy) = Dot.backward(Wy_aux, (dMx, ))
         (dg_t, dWh) = Dot.backward(Wh_aux, (dWh_dot_g_t_rep, ))
 
+        self.accum_gradients(dWy, dWh, dw.squeeze())
+
         return (dh_out, dg_t.squeeze(), demb_in)
+
+    def accum_gradients(self, dWy, dWh, dw):
+        self.grads['Wy'] += dWy
+        self.grads['Wh'] += dWh
+        self.grads['w'] += dw
+

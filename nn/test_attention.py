@@ -27,14 +27,22 @@ class TestAttention(TestCase):
 
             return (h_out, g_t, emb_in, )
 
-        check = check_finite_differences(
-            att.forward,
-            att.backward,
-            gen_input_fn=gen_input,
-            test_inputs=(0, 1, 2),
-            aux_only=True
+        self.assertTrue(
+            check_finite_differences(
+                att.forward,
+                att.backward,
+                gen_input_fn=gen_input,
+                test_inputs=(0, 1, 2),
+                aux_only=True
+            )
         )
-        self.assertTrue(check)
+        TestParamGradInLayer.check_layers_params(
+            att,
+            gen_input(),
+            self.assertTrue
+        )
+
+
 
 
 if __name__ == "__main__":
