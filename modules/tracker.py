@@ -1,10 +1,15 @@
-from nn import Block, Vars, Sequential, LinearLayer, Softmax, Switch, Concat
+from nn import ParametrizedBlock, Vars, Sequential, LinearLayer, Softmax, Switch, Concat
 from db_dist import DBDist
 
 
-class Tracker(Block):
+class Tracker(ParametrizedBlock):
     def __init__(self, input_h_size, input_s_size):
-        self.mlp_update = Sequential([LinearLayer(input_h_size + input_s_size, 2), Softmax(), ])
+        self.mlp_update = Sequential([
+            LinearLayer(input_h_size + input_s_size, 2),
+            Softmax(),
+        ])
+
+        self.parametrize_from_layers([self.mlp_update], ["mlp_update"])
 
     def forward(self, (tr, slu, h_t, s, )):
         ((mlp_in, ), mlp_in_aux, ) = Concat.forward((h_t, s))

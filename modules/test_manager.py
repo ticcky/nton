@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 
 from manager import Manager
-from nn.utils import check_finite_differences
+from nn.utils import check_finite_differences, TestParamGradInLayer
 
 
 class TestManager(unittest.TestCase):
@@ -14,7 +14,7 @@ class TestManager(unittest.TestCase):
 
             return (s, h_t, db_count, )
 
-        (s, h_t, db_count) = gen_input()
+        test_input = (s, h_t, db_count) = gen_input()
 
         mgr = Manager(5, 10, 1, hidden_size=128)
 
@@ -30,8 +30,19 @@ class TestManager(unittest.TestCase):
             mgr.forward,
             mgr.backward,
             gen_input_fn=gen_input,
-            aux_only=True
+            aux_only=True,
+            test_inputs=(0, 1, 2, )
         ))
+
+        for param_name in mgr.params.var_names:
+            layer = TestParamGradInLayer(mgr, param_name, test_input)
+            self.assertTrue(check_finite_differences(
+                layer.forward,
+                layer.backward,
+                gen_input_fn=layer.gen_input
+            ), 'Gradient check for param: %s' % param_name)
+
+
 
 
 if __name__ == '__main__':

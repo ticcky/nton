@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def check_finite_differences(fwd_fn, bwd_fn, delta=1e-5, n_times=10, gen_input_fn=None, test_inputs=(0, ), test_outputs=None, aux_only=False):
+def check_finite_differences(fwd_fn, bwd_fn, delta=1e-5, n_times=10, gen_input_fn=None, test_inputs=(0, ), test_outputs=None, aux_only=True):
     """Check that the analytical gradient `bwd_fn` matches the true gradient.
     It is verified using the finite differences method on fwd_fn..
     :param fwd_fn:
@@ -92,6 +92,9 @@ class TestParamGradInLayer:
     def gen(self):
         return np.random.randn(*self.orig_shape)
 
+    def gen_input(self):
+        return (self.gen(), )
+
     def forward(self, (x, )):
         #orig = self.layer.params[self.param_name].copy()
         self.layer.params[self.param_name][:] = x
@@ -106,6 +109,16 @@ class TestParamGradInLayer:
         self.layer.backward(aux, grads)
 
         return (self.layer.grads[self.param_name], )
+
+    @staticmethod
+    def check_layers_params(layer, test_input, assert_true_fn):
+        for param_name in layer.params.var_names:
+            aux_layer = TestParamGradInLayer(layer, param_name, test_input)
+            assert_true_fn(check_finite_differences(
+                aux_layer.forward,
+                aux_layer.backward,
+                gen_input_fn=aux_layer.gen_input
+            ), 'Gradient check for param: %s' % param_name)
 
 
 

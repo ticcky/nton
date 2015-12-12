@@ -1,15 +1,20 @@
 import numpy as np
 
-from nn import LSTM, Block, Attention, Vars
+from nn import LSTM, ParametrizedBlock, Attention, Vars
 
 
-class NLU(Block):
+class NLU(ParametrizedBlock):
     def __init__(self, n_cells, emb_dim, n_slu):
         self.input_rnn = LSTM(n_in=emb_dim, n_out=n_cells)
 
         self.slus = []
         for i in range(n_slu):
             self.slus.append(Attention(n_hidden=n_cells))
+
+        self.parametrize_from_layers(
+            [self.input_rnn] + self.slus,
+            ["input_rnn"] + ["slu%.2d" % i for i in range(n_slu)]
+        )
 
     def forward(self, (E, )):
         h0, c0 = self.input_rnn.get_init()

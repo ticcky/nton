@@ -1,9 +1,9 @@
 import numpy as np
 
-from nn import Block, Vars, Sequential, LinearLayer, Softmax, LSTM, DBMap
+from nn import ParametrizedBlock, Vars, Sequential, LinearLayer, Softmax, LSTM, DBMap
 
 
-class NLG(Block):
+class NLG(ParametrizedBlock):
     def __init__(self, vocab_len, lstm_n_cells, dbmap_mapping):
         self.lstm = LSTM(vocab_len, lstm_n_cells)
         self.h_to_o = Sequential([
@@ -11,6 +11,10 @@ class NLG(Block):
             Softmax()
         ])
         self.db_map = DBMap(dbmap_mapping)
+
+        self.parametrize_from_layers(
+            [self.lstm, self.h_to_o], ["lstm", "h_to_o"]
+        )
 
     def forward(self, inputs):
         input_iter = iter(inputs)
@@ -90,12 +94,4 @@ class NLG(Block):
         dy_in = np.array(list(reversed(lst_dy_in[-aux['y_in_len']:])))
 
         return (dc_tm1[0], dy_in, None) + dexternal_inputs
-
-
-
-
-
-
-
-
 

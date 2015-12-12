@@ -1,13 +1,17 @@
-from nn import Block, Vars, Sequential, LinearLayer, Tanh, Concat
+from nn import ParametrizedBlock, Vars, Sequential, LinearLayer, Tanh, Concat
 
 
-class Manager(Block):
+class Manager(ParametrizedBlock):
     def __init__(self, input_h_size, input_s_size, db_count_size, hidden_size):
         self.mlp_update = Sequential([
             LinearLayer(input_h_size + input_s_size + db_count_size, hidden_size),
             Tanh(),
             LinearLayer(hidden_size, input_s_size)
         ])
+
+        self.parametrize_from_layers(
+            [self.mlp_update], ["mlp_update"]
+        )
 
     def forward(self, (s, h_t, db_count, )):
         ((mlp_in, ), mlp_in_aux, ) = Concat.forward((s, h_t, db_count, ))

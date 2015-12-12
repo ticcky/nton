@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 
 from tracker import Tracker
-from nn.utils import check_finite_differences
+from nn.utils import check_finite_differences, TestParamGradInLayer
 
 
 class TestTracker(unittest.TestCase):
@@ -15,7 +15,7 @@ class TestTracker(unittest.TestCase):
 
             return (tr, slu, h_t, s, )
 
-        (tr, slu, h_t, s) = gen_input()
+        test_input = (tr, slu, h_t, s) = gen_input()
 
         tracker = Tracker(5, 7)
 
@@ -33,6 +33,12 @@ class TestTracker(unittest.TestCase):
             gen_input_fn=gen_input,
             aux_only=True
         ))
+
+        TestParamGradInLayer.check_layers_params(
+            tracker,
+            test_input,
+            self.assertTrue
+        )
 
 
 if __name__ == '__main__':

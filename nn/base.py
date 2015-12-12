@@ -15,6 +15,7 @@ class ParametrizedBlock(Block):
         self._grads = grads
 
     def parametrize_from_layers(self, layers, layer_names):
+        assert len(layers) == len(layer_names)
         params = {}
         grads = {}
         for layer_name, layer in zip(layer_names, layers):

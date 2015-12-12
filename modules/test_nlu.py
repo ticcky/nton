@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 
 from modules.nlu import NLU
-from nn.utils import check_finite_differences
+from nn.utils import check_finite_differences, TestParamGradInLayer
 
 
 
@@ -30,6 +30,11 @@ class TestNLU(unittest.TestCase):
                 aux_only=True
             ),
             "Gradient check failed!"
+        )
+        TestParamGradInLayer.check_layers_params(
+            nlu,
+            gen(),
+            self.assertTrue
         )
 
 

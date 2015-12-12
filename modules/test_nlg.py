@@ -4,7 +4,7 @@ import numpy as np
 from vocab import Vocab
 from modules.nlg import NLG
 from db_dist import DBDist
-from nn.utils import check_finite_differences
+from nn.utils import check_finite_differences, TestParamGradInLayer
 
 
 class TestNLG(unittest.TestCase):
@@ -72,6 +72,13 @@ class TestNLG(unittest.TestCase):
             )
         )
 
+        for param_name in nlg.params.var_names:
+            layer = TestParamGradInLayer(nlg, param_name, inputs)
+            self.assertTrue(check_finite_differences(
+                layer.forward,
+                layer.backward,
+                gen_input_fn=layer.gen_input
+            ), 'Gradient check for param: %s' % param_name)
 
 
 if __name__ == '__main__':

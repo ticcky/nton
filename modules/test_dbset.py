@@ -60,7 +60,8 @@ class TestDBSet(unittest.TestCase):
             dbset.forward,
             dbset.backward,
             gen_input_fn=gen_input,
-            aux_only=True
+            aux_only=True,
+            test_inputs=(0, 1, 2,)
         ))
 
 
