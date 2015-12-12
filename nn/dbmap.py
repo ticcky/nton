@@ -5,6 +5,12 @@ from nn import Block, Vars
 
 class DBMap(Block):
     def __init__(self, mapping):
+        """
+
+        :param mapping: list, n-th element of mapping says which x's dimension
+                does n-th db input correspond to
+        :return:
+        """
         self.mapping = mapping
 
     def forward(self, inputs):

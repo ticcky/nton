@@ -21,7 +21,7 @@ def check_finite_differences(fwd_fn, bwd_fn, delta=1e-5, n_times=10, gen_input_f
 
         return res
 
-
+    warn_errs = []
     for n in range(n_times):
         rand_input = gen_input_fn()
 
@@ -64,14 +64,18 @@ def check_finite_differences(fwd_fn, bwd_fn, delta=1e-5, n_times=10, gen_input_f
                         print 'GRADIENT WARNING', 'inp', i, 'dim', dim, 'val', x,
                         print 'an', grad_an, 'num', grad_num,
                         print 'rel error', rel_error,
+                        warn_errs.append(rel_error)
                         if rel_error > 1:
                             print 'GRADIENT ERROR TOO LARGE!'
+                            print 'AVG REL ERR:', np.mean(warn_errs)
                             return False
                         print
                     else:
                         #print 'GRADIENT OK', 'inp', i, 'dim', dim, 'x', x, 'an', grad_an, 'num', grad_num
                         pass
 
+    if warn_errs:
+        print 'AVG REL ERR:', np.mean(warn_errs)
 
     return True
 

@@ -64,7 +64,5 @@ class TestDBDist(unittest.TestCase):
         self.assertTrue(check)
 
 
-
-
 if __name__ == '__main__':
     unittest.main()
