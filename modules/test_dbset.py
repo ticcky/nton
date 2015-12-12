@@ -38,7 +38,9 @@ class TestDBSet(unittest.TestCase):
         )
 
         (db_res, aux) = dbset.forward(input_val)
-        dinput_val = dbset.backward(aux, tuple(np.random.randn(*x.shape) for x in db_res))
+        entry_dist = db_res[0]
+        db_res = db_res[1:]
+        dinput_val = dbset.backward(aux, (np.random.randn(*entry_dist.shape), ) + tuple(np.random.randn(*x.shape) for x in db_res))
 
         self.assertEqual(len(dinput_val), len(input_val))
         for di, i in zip(dinput_val, input_val):
@@ -61,7 +63,7 @@ class TestDBSet(unittest.TestCase):
             dbset.backward,
             gen_input_fn=gen_input,
             aux_only=True,
-            test_inputs=(0, 1, 2,)
+            test_inputs=(0, 1, 2, )
         ))
 
 

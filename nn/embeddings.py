@@ -19,6 +19,17 @@ class OneHot(Block):
         return ((res, ), None)
 
 
+class OneHotFromVocab(Block):
+    def __init__(self, vocab):
+        self.vocab = vocab
+
+    def forward(self, (x, )):
+        res = np.zeros((len(x), len(self.vocab), ))
+        res[range(len(x)), tuple(self.vocab[i] for i in x)] = 1
+
+        return ((res, ), None)
+
+
 class Embeddings(ParametrizedBlock):
     """Embedding layer.
     Takes a tensor of integres as input and returns a tensor one order greater

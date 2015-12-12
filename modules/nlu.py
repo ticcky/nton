@@ -16,6 +16,9 @@ class NLU(ParametrizedBlock):
             ["input_rnn"] + ["slu%.2d" % i for i in range(n_slu)]
         )
 
+    def init_state(self):
+        return self.input_rnn.get_init()[0]
+
     def forward(self, (E, )):
         h0, c0 = self.input_rnn.get_init()
         ((H, C), H_aux) = self.input_rnn.forward((E[:, np.newaxis, :], h0, c0, ))

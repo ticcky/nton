@@ -21,17 +21,19 @@ class DBSet(Block):
             ((db_val, ), db_val_aux) = content_db.forward((entry_dist, ))
             res.append(db_val); res_aux.append(db_val_aux)
 
-        return (tuple(res), Vars(
+        return ((entry_dist, ) + tuple(res), Vars(
             res=res_aux,
             entry_dist=entry_dist_aux
         ))
 
     def backward(self, aux, dres):
+        dentry_dist = dres[0].copy()
+
         lst_dentry_dist = []
-        for ddb_val, res_aux, content_db in zip(dres, aux['res'], self.content_dbs):
+        for ddb_val, res_aux, content_db in zip(dres[1:], aux['res'], self.content_dbs):
             self.accum_grads((lst_dentry_dist, ), content_db.backward(res_aux, (ddb_val, )))
 
-        dentry_dist = sum(lst_dentry_dist)
+        dentry_dist += sum(lst_dentry_dist)
 
         dinputs = self.index_db.backward(aux['entry_dist'], (dentry_dist, ))
 

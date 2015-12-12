@@ -10,11 +10,12 @@ import matplotlib.pyplot as plt
 import seaborn as sbt
 sbt.set()
 
-from nn import (LSTM, OneHot, Sequential, LinearLayer, Softmax, Sigmoid, Vars,
+from nn import (LSTM, OneHotFromVocab, Sequential, LinearLayer, Softmax, Sigmoid, Vars,
                 ParametrizedBlock, VanillaSGD, Adam, Embeddings, LearnableInput,
-                ReLU)
+                ReLU, Sum)
 from nn.attention import Attention
 from nn.switch import Switch
+import modules
 from dbn import DBN
 from seq_loss import SeqLoss
 from data_caminfo import DataCamInfo
@@ -24,242 +25,63 @@ from util import hplot
 
 
 class NTON(ParametrizedBlock):
-    def __init__(self, n_tokens, n_cells, dbs, emb, vocab, max_gen=10):
-        self.n_tokens = n_tokens
+    def __init__(self, n_cells, mgr_h_dims, db_index, db_contents, db_mapping, vocab, index_vocab):
         self.n_cells = n_cells
-        self.max_gen = max_gen
+
         self.vocab = vocab
+        self.n_db_keys = len(db_contents)
+        vocab_size = len(vocab)
 
-        self.dbs_keys, self.dbs = zip(*dbs.iteritems())
+        self.one_hot = OneHotFromVocab(vocab)
+        self.mgr = modules.Manager(n_cells, n_cells, 1, mgr_h_dims)
+        self.nlu = modules.NLU(n_cells, vocab_size, self.n_db_keys)
+        self.nlg = modules.NLG(vocab_size, n_cells, db_mapping)
+        self.tracker = modules.Tracker(n_cells, n_cells)
+        self.dbset = modules.DBSet(db_index, db_contents, vocab, index_vocab)
 
-        self.n_dbs = len(dbs)
-        self.db_key_len = 3
-        for db in dbs.values():
-            assert db.n == self.db_key_len
-
-        self.emb = emb
-
-        n_ndx = 5
-
-        self.ndx_emb = LearnableInput((n_ndx, n_cells))
-        #self.ndx_x = np.array([DBN.get_1hot_from(DBN.item_pattern % i, vocab) for i in range(n_ndx)])
-
-        emb_dim = emb.size()
-        self.input_rnn = LSTM(n_in=emb_dim, n_out=n_cells)
-        self.output_rnn = LSTM(n_in=emb_dim, n_out=n_cells)
-        self.output_rnn_clf = Sequential([
-            LinearLayer(n_in=n_cells, n_out=n_tokens),
-            Softmax()
-        ])
-
-        self.att_switch = Sequential([
-            #LinearLayer(n_in=n_cells, n_out=n_cells),
-            #ReLU(),
-            LinearLayer(n_in=n_cells, n_out=8),
-            Softmax()
-        ])
-
-        self.atts = []
-        for i in range(self.db_key_len):
-            self.atts.append(Attention(n_hidden=n_cells))
-
-        self.att_ndx = Attention(n_hidden=n_cells)
-
-        self.param_layers, self.param_layers_names = zip(*(
-            [
-                (self.output_rnn_clf, 'out_rnn_clf'),
-                (self.output_rnn, 'out_rnn'),
-                (self.att_switch, 'att_switch'),
-                (self.att_ndx, 'att_ndx'),
-                (self.input_rnn, 'in_rnn'),
-            ] + zip(
-                self.atts,
-                ('att%d' % i for i in range(len(self.atts)))
-            )
-        ))
+        self.parametrize_from_layers(
+            [self.mgr, self.nlu, self.nlg, self.tracker],
+            ["mgr", "nlu", "nlg", "tracker"]
+        )
 
         self.print_widths = defaultdict(dict)
 
-        self.parametrize_from_layers(self.param_layers, self.param_layers_names)
+    def forward(self, dialog):
+        s_t = self.mgr.init_state()
+        tr_tm1 = tuple(np.ones((len(self.vocab), )) for _ in range(self.n_db_keys))
+        slu = tuple(np.zeros((len(self.vocab), )) for _ in range(self.n_db_keys))
 
-    def forward(self, (E, eos_token, x_a_emb), no_print=False):
-        t = time.time()
-        h0, c0 = self.input_rnn.get_init()
-        ((H, C ), H_aux) = self.input_rnn.forward((E[:, np.newaxis, :], h0, c0, ))   # Process input sequence.
-        H = H[:, 0]
-        C = C[:, 0]
+        h_t = self.nlu.init_state()
 
-        h_tm1 = H[-1]       # Initial state of the output RNN is equal to the input RNN.
-        c_tm1 = C[-1]
+        for sys, usr in dialog:
+            print 'sys', sys
+            print 'usr', usr
+            ((O_t, ), O_t_aux) = self.one_hot.forward((("<start>", ) + tuple(sys.split()), ))
+            ((I_t, ), I_t_aux) = self.one_hot.forward((usr.split(), ))
 
-        y_tm1 = eos_token   # Prepare initial input symbol for generating.
+            (db_res_t, db_res_t_aux) = self.dbset.forward(tr_tm1)
+            db_dist_t = db_res_t[0]
+            db_t = db_res_t[1:]
+            ((O_hat_t, ), O_hat_t_aux) = self.nlg.forward((s_t, O_t, 0, ) + db_t + tr_tm1 + slu)
 
-        Y = []
-        y = []
-        gen_aux = []
-        for i in range(self.max_gen):   # Generate maximum `max_gen` words.
-            t = time.time()
-            ((y_tm1, h_tm1, c_tm1), aux_t) = self.forward_gen_step((y_tm1, h_tm1, c_tm1, H, E))
+            (nlu_t, nlu_t_aux) = self.nlu.forward((I_t, ))
+            h_t = nlu_t[0]
 
-            Y.append(y_tm1.squeeze())
-            gen_aux.append(aux_t)
+            tr_t = []
+            for tr_tm1_i, nlu_t_i in zip(tr_tm1, nlu_t[1:]):
+                ((tr_t_i, ), tr_t_i_aux) = self.tracker.forward((tr_tm1_i, nlu_t_i, h_t, s_t, ))
+                tr_t.append(tr_t_i)
 
-            #prev_y_ndx = np.random.choice(self.n_tokens, p=y_t)
+            ((db_count_t, ), db_count_t_aux) = Sum.forward((db_dist_t, ))
 
-            y_decoded_token = y_tm1.argmax()
-            y.append(y_decoded_token)
+            self.mgr.forward((s_t, h_t, db_count_t, ))
 
-            if x_a_emb != None:
-                y_tm1 = x_a_emb[i - 1]
-            else:
-                y_tm1 = np.zeros_like(eos_token)
-                y_tm1[y_decoded_token] = 1
-
-        Y = np.array(Y)
-        y = np.array(y)
-
-        return ((Y, y), Vars(
-            H_aux=H_aux,
-            gen_n=len(y),
-            gen_aux=gen_aux
-        ))
-
-    def forward_gen_step(self, (y_tm1, h_tm1, c_tm1, H, E)):
-        ((h_t, c_t), h_t_aux_curr) = self.output_rnn.forward((y_tm1[np.newaxis, np.newaxis, :], h_tm1, c_tm1))
-        h_t = h_t[0][0]
-        c_t = c_t[0][0]
-
-        ((rnn_result_t, ), rnn_result_aux_curr) = self.output_rnn_clf.forward((h_t, ))  # Get RNN LM result.
-
-        queries_t = []
-        queries_t_aux = []
-        for att in self.atts:
-            ((query_a_t, ), query_a_t_aux_curr) = att.forward((H, h_t, E, ))      # Get the result from database.
-            queries_t.append(query_a_t)
-            queries_t_aux.append(query_a_t_aux_curr)
-
-        ((ndx_emb, ), ndx_emb_aux) = self.ndx_emb.forward(())
-        #((query_ndx_t, ), query_ndx_t_aux) = self.att_ndx.forward((ndx_emb, h_t, self.ndx_x))
-
-        total_query = tuple(queries_t) #+ (np.ones_like(query_ndx_t), )  # !!! TODO
-
-        db_results_t = []
-        db_results_t_aux = []
-        for db in self.dbs:
-            ((db_i_result_t, ), db_i_result_t_aux_curr) = db.forward(total_query)
-            db_results_t.append(db_i_result_t)
-            db_results_t_aux.append(db_i_result_t_aux_curr)
-
-        #att_sw_in_t = np.zeros((len(db_results_t) + 1, self.n_cells))
-        #att_sw_out_t = np.array([rnn_result_t] + db_results_t)
-        #((y_t, ), y_t_aux) = self.att_switch.forward((att_sw_in_t, h_t, att_sw_out_t))
-        ((swp_t, ), swp_t_aux) = self.att_switch.forward((h_t, ))
-
-        ((y_t, ), y_t_aux) = Switch.forward((swp_t, rnn_result_t, ) + tuple(db_results_t))
-
-        aux = Vars(
-            h_t=h_t_aux_curr,
-            rnn_result_t=rnn_result_aux_curr,
-            queries_t=queries_t_aux,
-            ndx_emb=ndx_emb_aux,
-            #query_ndx_t=query_ndx_t_aux,
-            db_results_t=db_results_t_aux,
-            swp_t=swp_t_aux,
-            y_t=y_t_aux,
-        )
-
-        self.forward_gen_step_debug(**locals())
-
-        return ((y_t, h_t, c_t), aux)
-
-    def backward_gen_step(self, aux, (dy_t, dh_t, dc_t)):
-        dh_t_lst = [dh_t]
-
-        dswitch = Switch.backward(aux['y_t'], (dy_t, ))
-        dswp_t = dswitch[0]
-        drnn_result_t = dswitch[1]
-        ddb_results_t = dswitch[2:]
-
-        (dh_t, ) = self.att_switch.backward(aux['swp_t'], (dswp_t, ))
-        dh_t_lst.append(dh_t)
-
-        dtotal_query = None
-
-        #print
-        #print 'dymax', norm(dy_t)
-        for db, ddb, db_aux in zip(self.dbs, ddb_results_t, aux['db_results_t']):
-            dtotal_query_i = db.backward(db_aux, (ddb, ))
-            #print 'ddbmax', norm(ddb)
-            #print [norm(x) for x in dtotal_query_i]
-
-            if dtotal_query == None:
-                dtotal_query = tuple(np.zeros_like(x) for x in dtotal_query_i)
-
-            for dtotal_query_ij, dtotal_query_j in zip(dtotal_query_i, dtotal_query):
-                dtotal_query_j += dtotal_query_ij
-
-        dqueries_t = dtotal_query #[:-1]
-        #dquery_ndx_t = dtotal_query[-1]
-
-        #(dndx_emb, dh_t, _, ) = self.att_ndx.backward(aux['query_ndx_t'], (dquery_ndx_t, ))
-        #dh_t_lst.append(dh_t)
-
-        #self.ndx_emb.backward(aux['ndx_emb'], (dndx_emb, ))
-
-        t = time.time()
-        dE_lst = []
-        dH_lst = []
-        for att, att_aux, dquery_t in zip(self.atts, aux['queries_t'], dqueries_t):
-            (dH, dh_t, dE, ) = att.backward(att_aux, (dquery_t, ))
-            dH_lst.append(dH)
-            dh_t_lst.append(dh_t)
-            dE_lst.append(dE)
-
-        dE_t = sum(dE_lst)
-        dH_t = sum(dH_lst)
-
-        t = time.time()
-        (dh_t, ) = self.output_rnn_clf.backward(aux['rnn_result_t'], (drnn_result_t, ))
-        dh_t_lst.append(dh_t)
-
-        dh_t = sum(dh_t_lst)
-
-        (dx_t, dh_tm1, dc_tm1, ) = self.output_rnn.backward(aux['h_t'], ((dh_t)[None, None, :], dc_t[None, None, :], ))
-
-        return (dx_t[0, 0], dh_tm1[0], dc_tm1[0], dH_t, dE_t, )
+            tr_tm1 = tuple(tr_t)
+            print 'done'
 
 
-    def forward_gen_step_debug(self_, y_t, db_results_t, rnn_result_t, queries_t_aux, swp_t_aux, **kwargs):
-        self = self_
-        # Debug print something.
-        db_argmax = np.argmax(db_results_t, axis=1)
-        rnn_argmax = np.argmax(rnn_result_t)
-        y_t_argmax = y_t.argmax()
-
-        atts = []
-        for qaux, field in zip(queries_t_aux, DataCamInfo.query_fields):
-            atts.append("att_%s: %s" % (field, hplot(qaux['alpha'])))
-
-        db_results = []
-        for db_key, db_res in zip(self.dbs_keys, db_results_t):
-            db_argmax = db_res.argmax()
-            db_results.append(
-                '%s[%s, %.2f]' % (db_key, self.vocab.rev(db_argmax), db_res[db_argmax])
-            )
-
-        self.print_step('gen',
-            '     #> ',
-            'gen: %s' % self.vocab.rev(y_t_argmax),
-            " ".join(atts))
-        self.print_step('gen2',
-            '     # ',
-            #'att_ndx: %s' % hplot(query_ndx_t_aux['alpha']),
-            'att_sw: %s' % hplot(swp_t_aux['yaux'][-1]['y'], 1.0),
-            'rnn: %s (%.2f)' % (self.vocab.rev(rnn_argmax), rnn_result_t[rnn_argmax]))
-        self.print_step('gen3',
-            '     # ',
-            " ".join(db_results),
-        )
+    def backward(self, aux, (grads, _)):
+        pass
 
     def print_step(self, t, *args):
         widths = self.print_widths[t]
@@ -274,37 +96,8 @@ class NTON(ParametrizedBlock):
 
         print
 
-    def backward(self, aux, (grads, _)):
-        H_aux = aux['H_aux']
-        gen_aux = aux['gen_aux']
 
-        dh_tp1, dc_tp1 = self.output_rnn.get_init_grad()
-        dx_tp1 = np.zeros_like(grads[0])
-        dH = None
-        dE = None
-        for i in reversed(range(aux['gen_n'])):
-            (dx_tp1, dh_tp1, dc_tp1, dH_t, dE_t) = self.backward_gen_step(gen_aux[i], (dx_tp1 + grads[i], dh_tp1, dc_tp1))
 
-            if dH is None:
-                dH = dH_t.copy()
-            else:
-                dH += dH_t
-
-            if dE is None:
-                dE = dE_t.copy()
-            else:
-                dE += dE_t
-
-        dH[-1] += dh_tp1.squeeze()  # Output RNN back to Input RNN last state.
-        dC = np.zeros_like(dH)
-        dC[-1] += dc_tp1.squeeze()
-        dH = dH[:, np.newaxis, :]
-        dC = dC[:, np.newaxis, :]
-        (dE_2, dh0, dc0) = self.input_rnn.backward(H_aux, (dH, dC))
-
-        dE += dE_2[:, 0, :]
-
-        return (dE, dx_tp1)
 
     def zero_grads(self):
         for layer in self.param_layers:

@@ -1,17 +1,24 @@
+import numpy as np
+
 from nn import ParametrizedBlock, Vars, Sequential, LinearLayer, Tanh, Concat
 
 
 class Manager(ParametrizedBlock):
-    def __init__(self, input_h_size, input_s_size, db_count_size, hidden_size):
+    def __init__(self, input_h_size, state_size, db_count_size, hidden_size):
+        self.state_size = state_size
+
         self.mlp_update = Sequential([
-            LinearLayer(input_h_size + input_s_size + db_count_size, hidden_size),
+            LinearLayer(input_h_size + state_size + db_count_size, hidden_size),
             Tanh(),
-            LinearLayer(hidden_size, input_s_size)
+            LinearLayer(hidden_size, state_size)
         ])
 
         self.parametrize_from_layers(
             [self.mlp_update], ["mlp_update"]
         )
+
+    def init_state(self):
+        return np.zeros((self.state_size, ))
 
     def forward(self, (s, h_t, db_count, )):
         ((mlp_in, ), mlp_in_aux, ) = Concat.forward((s, h_t, db_count, ))
