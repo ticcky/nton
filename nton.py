@@ -47,41 +47,123 @@ class NTON(ParametrizedBlock):
         self.print_widths = defaultdict(dict)
 
     def forward(self, dialog):
-        s_t = self.mgr.init_state()
+        s_tm1 = self.mgr.init_state()
         tr_tm1 = tuple(np.ones((len(self.vocab), )) for _ in range(self.n_db_keys))
         slu = tuple(np.zeros((len(self.vocab), )) for _ in range(self.n_db_keys))
 
-        h_t = self.nlu.init_state()
-
+        res = []
+        res_aux = []
+        db_res_aux = []
+        nlu_aux = []
+        tr_aux = []
+        s_aux = []
+        db_count_aux = []
         for sys, usr in dialog:
             print 'sys', sys
             print 'usr', usr
             ((O_t, ), O_t_aux) = self.one_hot.forward((("<start>", ) + tuple(sys.split()), ))
             ((I_t, ), I_t_aux) = self.one_hot.forward((usr.split(), ))
 
-            (db_res_t, db_res_t_aux) = self.dbset.forward(tr_tm1)
-            db_dist_t = db_res_t[0]
-            db_t = db_res_t[1:]
-            ((O_hat_t, ), O_hat_t_aux) = self.nlg.forward((s_t, O_t, 0, ) + db_t + tr_tm1 + slu)
+            (db_res_t, db_res_t_aux) = self.dbset.forward(tr_tm1)   # Query the database.
+            db_dist_t = db_res_t[0]; db_t = db_res_t[1:]
+            ((db_count_t, ), db_count_t_aux) = Sum.forward((db_dist_t, ))
+            db_count_aux.append(db_count_t_aux)
 
-            (nlu_t, nlu_t_aux) = self.nlu.forward((I_t, ))
+            ((O_hat_t, ), O_hat_t_aux) = self.nlg.forward((s_tm1, O_t, 0, ) + db_t + tr_tm1 + slu)
+            O_hat_t_aux['lens'] = (len(db_t), len(tr_tm1), len(slu), )
+
+            (nlu_t, nlu_t_aux) = self.nlu.forward((I_t, ))  # Process user's input.
             h_t = nlu_t[0]
 
-            tr_t = []
+            tr_t = []  # For each slot, update the tracker's state.
+            tr_t_aux = []
             for tr_tm1_i, nlu_t_i in zip(tr_tm1, nlu_t[1:]):
-                ((tr_t_i, ), tr_t_i_aux) = self.tracker.forward((tr_tm1_i, nlu_t_i, h_t, s_t, ))
+                ((tr_t_i, ), tr_t_i_aux) = self.tracker.forward((tr_tm1_i, nlu_t_i, h_t, s_tm1, ))
                 tr_t.append(tr_t_i)
+                tr_t_aux.append(tr_t_i_aux)
 
-            ((db_count_t, ), db_count_t_aux) = Sum.forward((db_dist_t, ))
-
-            self.mgr.forward((s_t, h_t, db_count_t, ))
+            ((s_t, ), s_t_aux) = self.mgr.forward((s_tm1, h_t, db_count_t, ))
 
             tr_tm1 = tuple(tr_t)
-            print 'done'
+            s_tm1 = s_t
+
+            res.append(O_hat_t)
+            res_aux.append(O_hat_t_aux)
+            db_res_aux.append(db_res_t_aux)
+            nlu_aux.append(nlu_t_aux)
+            tr_aux.append(tr_t_aux)
+            s_aux.append(s_t_aux)
+
+        return ((res, ), Vars(
+            dialog=dialog,
+            res=res_aux,
+            s=s_aux,
+            tr=tr_aux,
+            nlu=nlu_aux,
+            db_count=db_count_aux,
+            db_res=db_res_aux
+        ))
 
 
-    def backward(self, aux, (grads, _)):
-        pass
+    def backward(self, aux, (dres, _)):
+        ds_t = self.mgr.init_state()
+        dtr_tp1 = tuple(np.zeros((len(self.vocab), )) for _ in range(self.n_db_keys))
+
+        n_steps = 0
+        for (sys, usr), dO_hat_t, dO_hat_t_aux, ddb_res_t_aux, ddb_count_t_aux, dnlu_t_aux, dtr_t_aux, ds_t_aux in zip(reversed(aux['dialog']), dres, aux['res'], aux['db_res'], aux['db_count'], aux['nlu'], aux['tr'], aux['s']):
+            n_steps += 1
+            dh_t_lst = []
+            ds_tm1_lst = []
+            (ds_tm1, dh_t, ddb_count_t, ) = self.mgr.backward(ds_t_aux, (ds_t, ))
+            dh_t_lst.append(dh_t)
+            ds_tm1_lst.append(ds_tm1)
+
+            dtr_tm1_lst = []
+            dtr_tm1 = []
+            dnlu_t = []
+            for dtr_tp1_i, dtr_t_i_aux in zip(dtr_tp1, dtr_t_aux):
+                (dtr_t_i, dnlu_t_i, dh_t, ds_tm1, ) = self.tracker.backward(dtr_t_i_aux, (dtr_tp1_i))
+                dtr_tm1.append(dtr_t_i)
+                dnlu_t.append(dnlu_t_i)
+                dh_t_lst.append(dh_t)
+                ds_tm1_lst.append(ds_tm1)
+            dtr_tm1_lst.append(dtr_tm1)
+
+            (dI_t, ) = self.nlu.backward(dnlu_t_aux, (sum(dh_t_lst), ) +  tuple(dnlu_t))
+
+            dnlg = self.nlg.backward(dO_hat_t_aux, (dO_hat_t,))
+            lens = dO_hat_t_aux['lens']
+
+            (ddb_dist_t, ) = Sum.backward(ddb_count_t_aux)
+
+            ds_tm1, dO_t = dnlg[:2]
+            ds_tm1_lst.append(ds_tm1)
+            ddb_t, dtr_tm1, dslu = self._unwrap(dnlg[3:], lens)
+            dtr_tm1_lst.append(dtr_tm1)
+
+            ddb_res_t = (ddb_dist_t, ) + ddb_t
+
+            dtr_tm1 = self.dbset.backward(ddb_res_t_aux, ddb_res_t)
+            dtr_tm1_lst.append(dtr_tm1)
+
+            ds_t = sum(ds_tm1_lst)
+            dtr_tp1 = dtr_t
+
+        assert len(aux['dialog']) == n_steps
+
+
+
+    def _unwrap(self, dy, lens):
+        ptr = 0
+        res = []
+        for len_i in lens:
+            res.append(dy[ptr:ptr + len_i])
+            ptr += len_i
+
+        assert ptr == len(dy)
+
+        return tuple(res)
+
 
     def print_step(self, t, *args):
         widths = self.print_widths[t]
