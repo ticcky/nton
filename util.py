@@ -1,8 +1,5 @@
 # coding=utf-8
 from collections import OrderedDict
-import chainer
-from chainer import cuda
-import chainer.optimizers as O
 import numpy as np
 
 import os

@@ -52,10 +52,20 @@ class TestNTON(unittest.TestCase):
                 for word in sys.split() + usr.split():
                     vocab.add(word)
 
-        nton = NTON(5, 5, db_content, [db_content_name, db_content_phone, db_content_price], db_mapping, vocab, entry_vocab)
+        nton = NTON(n_cells=5,
+                    mgr_h_dims=5,
+                    db_index=db_content,
+                    db_contents=[db_content_name, db_content_phone, db_content_price],
+                    db_mapping=db_mapping,
+                    vocab=vocab,
+                    index_vocab=entry_vocab)
         for dialog in dialogs:
             print 'Dialog 1'
-            nton.forward(dialog)
+            (res, res_aux, ) = nton.forward(dialog)
+            dres = []
+            for var in res:
+                dres.append(np.random.randn(*var.shape))
+            nton.backward(res_aux, tuple(dres))
 
 
 

@@ -12,7 +12,7 @@ sbt.set()
 
 from nn import (LSTM, OneHotFromVocab, Sequential, LinearLayer, Softmax, Sigmoid, Vars,
                 ParametrizedBlock, VanillaSGD, Adam, Embeddings, LearnableInput,
-                ReLU, Sum)
+                ReLU, Sum, OneHot)
 from nn.attention import Attention
 from nn.switch import Switch
 import modules
@@ -22,6 +22,7 @@ from data_caminfo import DataCamInfo
 import metrics
 
 from util import hplot
+from vocab import Vocab
 
 
 class NTON(ParametrizedBlock):
@@ -47,6 +48,11 @@ class NTON(ParametrizedBlock):
         self.print_widths = defaultdict(dict)
 
     def forward(self, dialog):
+        """Takes dialog and returns system replies to individual turns.
+
+        :param dialog:
+        :return:
+        """
         s_tm1 = self.mgr.init_state()
         tr_tm1 = tuple(np.ones((len(self.vocab), )) for _ in range(self.n_db_keys))
         slu = tuple(np.zeros((len(self.vocab), )) for _ in range(self.n_db_keys))
@@ -59,22 +65,26 @@ class NTON(ParametrizedBlock):
         s_aux = []
         db_count_aux = []
         for sys, usr in dialog:
-            print 'sys', sys
-            print 'usr', usr
-            ((O_t, ), O_t_aux) = self.one_hot.forward((("<start>", ) + tuple(sys.split()), ))
-            ((I_t, ), I_t_aux) = self.one_hot.forward((usr.split(), ))
-
-            (db_res_t, db_res_t_aux) = self.dbset.forward(tr_tm1)   # Query the database.
+            # 1. Query the database.
+            (db_res_t, db_res_t_aux) = self.dbset.forward(tr_tm1)
             db_dist_t = db_res_t[0]; db_t = db_res_t[1:]
             ((db_count_t, ), db_count_t_aux) = Sum.forward((db_dist_t, ))
             db_count_aux.append(db_count_t_aux)
 
+            print 'sys', sys
+            print 'usr', usr
+
+            # 2. Generate system's output.
+            ((O_t, ), O_t_aux) = self.one_hot.forward((("<start>", ) + tuple(sys.split()), ))
             ((O_hat_t, ), O_hat_t_aux) = self.nlg.forward((s_tm1, O_t, 0, ) + db_t + tr_tm1 + slu)
             O_hat_t_aux['lens'] = (len(db_t), len(tr_tm1), len(slu), )
 
-            (nlu_t, nlu_t_aux) = self.nlu.forward((I_t, ))  # Process user's input.
+            # 3. Process what the user said.
+            ((I_t, ), I_t_aux) = self.one_hot.forward((usr.split(), ))
+            (nlu_t, nlu_t_aux) = self.nlu.forward((I_t, ))
             h_t = nlu_t[0]
 
+            # 4. Update tracker.
             tr_t = []  # For each slot, update the tracker's state.
             tr_t_aux = []
             for tr_tm1_i, nlu_t_i in zip(tr_tm1, nlu_t[1:]):
@@ -82,11 +92,14 @@ class NTON(ParametrizedBlock):
                 tr_t.append(tr_t_i)
                 tr_t_aux.append(tr_t_i_aux)
 
+            # 5. Update dialog state.
             ((s_t, ), s_t_aux) = self.mgr.forward((s_tm1, h_t, db_count_t, ))
 
+            # Pass current variables to the next step.
             tr_tm1 = tuple(tr_t)
             s_tm1 = s_t
 
+            # Save intermediate variables needed for backward pass.
             res.append(O_hat_t)
             res_aux.append(O_hat_t_aux)
             db_res_aux.append(db_res_t_aux)
@@ -94,7 +107,9 @@ class NTON(ParametrizedBlock):
             tr_aux.append(tr_t_aux)
             s_aux.append(s_t_aux)
 
-        return ((res, ), Vars(
+        res = tuple(res)
+
+        return (res, Vars(
             dialog=dialog,
             res=res_aux,
             s=s_aux,
@@ -105,12 +120,13 @@ class NTON(ParametrizedBlock):
         ))
 
 
-    def backward(self, aux, (dres, _)):
+    def backward(self, aux, dres):
         ds_t = self.mgr.init_state()
         dtr_tp1 = tuple(np.zeros((len(self.vocab), )) for _ in range(self.n_db_keys))
 
         n_steps = 0
-        for (sys, usr), dO_hat_t, dO_hat_t_aux, ddb_res_t_aux, ddb_count_t_aux, dnlu_t_aux, dtr_t_aux, ds_t_aux in zip(reversed(aux['dialog']), dres, aux['res'], aux['db_res'], aux['db_count'], aux['nlu'], aux['tr'], aux['s']):
+        items = zip(reversed(aux['dialog']), dres, aux['res'], aux['db_res'], aux['db_count'], aux['nlu'], aux['tr'], aux['s'])
+        for (sys, usr), dO_hat_t, dO_hat_t_aux, ddb_res_t_aux, ddb_count_t_aux, dnlu_t_aux, dtr_t_aux, ds_t_aux in items:
             n_steps += 1
             dh_t_lst = []
             ds_tm1_lst = []
@@ -122,19 +138,18 @@ class NTON(ParametrizedBlock):
             dtr_tm1 = []
             dnlu_t = []
             for dtr_tp1_i, dtr_t_i_aux in zip(dtr_tp1, dtr_t_aux):
-                (dtr_t_i, dnlu_t_i, dh_t, ds_tm1, ) = self.tracker.backward(dtr_t_i_aux, (dtr_tp1_i))
+                (dtr_t_i, dnlu_t_i, dh_t, ds_tm1, ) = self.tracker.backward(dtr_t_i_aux, (dtr_tp1_i, ))
                 dtr_tm1.append(dtr_t_i)
                 dnlu_t.append(dnlu_t_i)
                 dh_t_lst.append(dh_t)
                 ds_tm1_lst.append(ds_tm1)
             dtr_tm1_lst.append(dtr_tm1)
 
-            (dI_t, ) = self.nlu.backward(dnlu_t_aux, (sum(dh_t_lst), ) +  tuple(dnlu_t))
-
+            (dI_t, ) = self.nlu.backward(dnlu_t_aux, (sum(dh_t_lst), ) + tuple(dnlu_t))
             dnlg = self.nlg.backward(dO_hat_t_aux, (dO_hat_t,))
             lens = dO_hat_t_aux['lens']
 
-            (ddb_dist_t, ) = Sum.backward(ddb_count_t_aux)
+            (ddb_dist_t, ) = Sum.backward(ddb_count_t_aux, (ddb_count_t, ))
 
             ds_tm1, dO_t = dnlg[:2]
             ds_tm1_lst.append(ds_tm1)
@@ -147,7 +162,10 @@ class NTON(ParametrizedBlock):
             dtr_tm1_lst.append(dtr_tm1)
 
             ds_t = sum(ds_tm1_lst)
-            dtr_tp1 = dtr_t
+            #import ipdb; ipdb.set_trace()
+            dtr_tp1 = tuple(np.zeros((len(self.vocab), )) for _ in range(self.n_db_keys))
+            for dtr_tp1_i, dtr_tp1_is in zip(dtr_tp1, zip(*dtr_tm1_lst)):
+                dtr_tp1_i = sum(dtr_tp1_is)
 
         assert len(aux['dialog']) == n_steps
 
@@ -260,35 +278,51 @@ def main(**kwargs):
     data_train = cam_info.gen_data(test_data=False)
     data_test = cam_info.gen_data(test_data=True)
 
-    dbs = {}
+    db_index = cam_info.get_db_for(cam_info.query_fields, "id")
+
+    db_vals = []
     for field in cam_info.fields:
-        db = DBN(cam_info.get_db_for(cam_info.query_fields, field), cam_info.get_vocab())
-        db.vocab.freeze()
+        db_vals.append(cam_info.get_db_for(["id"], field))
 
-        dbs[field] = db
+    vocab = Vocab()
+    entry_vocab = Vocab(no_oov_eos=True)
 
-    assert len(dbs['food'].vocab) == len(dbs['area'].vocab)
-    vocab = dbs['food'].vocab
-    emb = OneHot(n_tokens=len(vocab))
+    for key, val in db_index:
+        for key_part in key:
+            vocab.add(key_part)
+        entry_vocab.add(val)
+
+    for cont in db_vals:
+        for key, val in cont:
+            vocab.add(val)
+
+    # dbset = modules.DBSet(db_index, db_vals, vocab, entry_vocab)
+    #
+    # dbs = {}
+    # for field in cam_info.fields:
+    #     db = DBN(cam_info.get_db_for(cam_info.query_fields, field), cam_info.get_vocab())
+    #     db.vocab.freeze()
+    #
+    #     dbs[field] = db
+    #
+    # assert len(dbs['food'].vocab) == len(dbs['area'].vocab)
+    # vocab = dbs['food'].vocab
+    # emb = OneHot(n_tokens=len(vocab))
+    mapping = []  # TODO: Proper mapping.
 
     nton = NTON(
-        n_tokens=len(vocab),
-        dbs=dbs,
-        emb=emb,
-        vocab=vocab,
-        **kwargs
+        50,
+        30,
+        db_index,
+        db_vals,
+        mapping,
+        vocab,
+        entry_vocab
     )
 
     update_rule = Adam(nton.params, nton.grads)
 
-    eval_nton(nton, emb, vocab, 'prep_test', data_test, 1)
-
-    # data_train = [
-    #     ("i would like chinese food", "ok chong is good"),
-    #     ("what about indian", "ok taj is good"),
-    #     ("give me czech", "go to hospoda"),
-    #     ("i like english food", "go to tavern")
-    # ]
+    #eval_nton(nton, emb, vocab, 'prep_test', data_test, 1)
 
     avg_loss = deque(maxlen=20)
     losses = []
