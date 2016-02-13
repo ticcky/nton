@@ -130,13 +130,22 @@ class NTON(ParametrizedBlock):
         ))
 
 
-    def backward(self, aux, dres):
+    def backward(self, aux, dO_hat):
         res = []
         ds_t = self.mgr.init_state()
         dtr_tp1 = tuple(np.zeros((len(self.vocab), )) for _ in range(self.n_db_keys))
 
         n_steps = 0
-        items = zip(reversed(aux['dialog_turns']), dres, aux['res'], aux['db_res'], aux['db_count'], aux['nlu'], aux['tr'], aux['s'])
+        items = reversed(zip(
+                aux['dialog_turns'],
+                dO_hat,
+                aux['res'],
+                aux['db_res'],
+                aux['db_count'],
+                aux['nlu'],
+                aux['tr'],
+                aux['s']
+        ))
         for (sys, usr), dO_hat_t, dO_hat_t_aux, ddb_res_t_aux, ddb_count_t_aux, dnlu_t_aux, dtr_t_aux, ds_t_aux in items:
             n_steps += 1
             dh_t_lst = []
