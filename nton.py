@@ -47,6 +47,17 @@ class NTON(ParametrizedBlock):
 
         self.print_widths = defaultdict(dict)
 
+    def forward_dialog(self, dialog):
+        num_dialog = []
+        for sys, usr in dialog:
+            ((O_t, ), _) = self.one_hot.forward((("<start>", ) + tuple(sys.split()), ))
+            ((I_t, ), _) = self.one_hot.forward((usr.split(), ))
+
+            num_dialog.append(O_t)
+            num_dialog.append(I_t)
+
+        return self.forward(num_dialog)
+
     def forward(self, dialog):
         """Takes dialog and returns system replies to individual turns.
 
@@ -55,7 +66,7 @@ class NTON(ParametrizedBlock):
         """
         s_tm1 = self.mgr.init_state()
         tr_tm1 = tuple(np.ones((len(self.vocab), )) for _ in range(self.n_db_keys))
-        slu = tuple(np.zeros((len(self.vocab), )) for _ in range(self.n_db_keys))
+        nlu_tm1 = tuple(np.zeros((len(self.vocab), )) for _ in range(self.n_db_keys))
 
         res = []
         res_aux = []
@@ -64,23 +75,21 @@ class NTON(ParametrizedBlock):
         tr_aux = []
         s_aux = []
         db_count_aux = []
-        for sys, usr in dialog:
+
+        dialog_turns = zip(dialog[::2], dialog[1::2])
+        for O_t, I_t in dialog_turns:
             # 1. Query the database.
             (db_res_t, db_res_t_aux) = self.dbset.forward(tr_tm1)
             db_dist_t = db_res_t[0]; db_t = db_res_t[1:]
             ((db_count_t, ), db_count_t_aux) = Sum.forward((db_dist_t, ))
             db_count_aux.append(db_count_t_aux)
 
-            print 'sys', sys
-            print 'usr', usr
-
             # 2. Generate system's output.
-            ((O_t, ), O_t_aux) = self.one_hot.forward((("<start>", ) + tuple(sys.split()), ))
-            ((O_hat_t, ), O_hat_t_aux) = self.nlg.forward((s_tm1, O_t, 0, ) + db_t + tr_tm1 + slu)
-            O_hat_t_aux['lens'] = (len(db_t), len(tr_tm1), len(slu), )
+            print len(db_t), len(tr_tm1), len(nlu_tm1)
+            ((O_hat_t, ), O_hat_t_aux) = self.nlg.forward((s_tm1, O_t, 0, ) + db_t + tr_tm1 + nlu_tm1)
+            O_hat_t_aux['lens'] = (len(db_t), len(tr_tm1), len(nlu_tm1), )
 
             # 3. Process what the user said.
-            ((I_t, ), I_t_aux) = self.one_hot.forward((usr.split(), ))
             (nlu_t, nlu_t_aux) = self.nlu.forward((I_t, ))
             h_t = nlu_t[0]
 
@@ -98,6 +107,7 @@ class NTON(ParametrizedBlock):
             # Pass current variables to the next step.
             tr_tm1 = tuple(tr_t)
             s_tm1 = s_t
+            nlu_tm1 = nlu_t[1:]
 
             # Save intermediate variables needed for backward pass.
             res.append(O_hat_t)
@@ -110,7 +120,7 @@ class NTON(ParametrizedBlock):
         res = tuple(res)
 
         return (res, Vars(
-            dialog=dialog,
+            dialog_turns=dialog_turns,
             res=res_aux,
             s=s_aux,
             tr=tr_aux,
@@ -121,11 +131,12 @@ class NTON(ParametrizedBlock):
 
 
     def backward(self, aux, dres):
+        res = []
         ds_t = self.mgr.init_state()
         dtr_tp1 = tuple(np.zeros((len(self.vocab), )) for _ in range(self.n_db_keys))
 
         n_steps = 0
-        items = zip(reversed(aux['dialog']), dres, aux['res'], aux['db_res'], aux['db_count'], aux['nlu'], aux['tr'], aux['s'])
+        items = zip(reversed(aux['dialog_turns']), dres, aux['res'], aux['db_res'], aux['db_count'], aux['nlu'], aux['tr'], aux['s'])
         for (sys, usr), dO_hat_t, dO_hat_t_aux, ddb_res_t_aux, ddb_count_t_aux, dnlu_t_aux, dtr_t_aux, ds_t_aux in items:
             n_steps += 1
             dh_t_lst = []
@@ -167,7 +178,12 @@ class NTON(ParametrizedBlock):
             for dtr_tp1_i, dtr_tp1_is in zip(dtr_tp1, zip(*dtr_tm1_lst)):
                 dtr_tp1_i = sum(dtr_tp1_is)
 
-        assert len(aux['dialog']) == n_steps
+            res.append(dI_t)
+            res.append(dO_t)
+
+        assert len(aux['dialog_turns']) == n_steps
+
+        return res[::-1]
 
 
 

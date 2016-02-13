@@ -59,13 +59,38 @@ class TestNTON(unittest.TestCase):
                     db_mapping=db_mapping,
                     vocab=vocab,
                     index_vocab=entry_vocab)
+
         for dialog in dialogs:
             print 'Dialog 1'
-            (res, res_aux, ) = nton.forward(dialog)
+            (res, res_aux, ) = nton.forward_dialog(dialog)
             dres = []
             for var in res:
                 dres.append(np.random.randn(*var.shape))
             nton.backward(res_aux, tuple(dres))
+
+        curr_dialog = 0
+
+        def gen_input():
+            num_turns = np.random.randint(2, 6)
+            dialog = []
+            for turn in range(num_turns):
+                n_words_system = np.random.randint(4, 8)
+                dialog.append(np.random.randn(n_words_system, len(nton.vocab)))
+
+                n_words_user = np.random.randint(4, 8)
+                dialog.append(np.random.randn(n_words_user, len(nton.vocab)))
+            print 'getting dialog'
+            return dialog
+
+        self.assertTrue(
+            check_finite_differences(
+                nton.forward,
+                nton.backward,
+                gen_input_fn=gen_input,
+                aux_only=True
+            )
+        )
+
 
 
 
