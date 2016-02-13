@@ -14,7 +14,8 @@ class TestNTON(unittest.TestCase):
     def test(self):
         db_data = DataCamInfo()
 
-        db_content = db_data.get_db_for(["area", "food", "pricerange"], "id")
+        db_keys = ["area", "food",]
+        db_content = db_data.get_db_for(db_keys, "id")
 
         db_content_name = db_data.get_db_for(["id"], "name")
         db_content_phone = db_data.get_db_for(["id"], "phone")
@@ -25,12 +26,10 @@ class TestNTON(unittest.TestCase):
         db_mapping = [
             vocab.add("<slu_area>"),
             vocab.add("<slu_food>"),
-            vocab.add("<slu_pricerange>"),
             vocab.add("<tr_area>"),
             vocab.add("<tr_food>"),
-            vocab.add("<tr_pricerange>"),
-            vocab.add("<db_area>"),
-            vocab.add("<db_food>"),
+            vocab.add("<db_name>"),
+            vocab.add("<db_phone>"),
             vocab.add("<db_pricerange>"),
         ]
         entry_vocab = Vocab(no_oov_eos=True)
@@ -54,6 +53,7 @@ class TestNTON(unittest.TestCase):
 
         nton = NTON(n_cells=5,
                     mgr_h_dims=5,
+                    n_db_keys=len(db_keys),
                     db_index=db_content,
                     db_contents=[db_content_name, db_content_phone, db_content_price],
                     db_mapping=db_mapping,

@@ -12,7 +12,7 @@ class DBSet(Block):
 
     def forward(self, inputs):
         assert type(inputs) == tuple
-        assert len(inputs) == self.index_db.n
+        assert len(inputs) == self.index_db.n, "Len inputs: %d, index_db.n: %d" % (len(inputs), self.index_db.n,)
 
         ((entry_dist, ), entry_dist_aux) = self.index_db.forward(inputs)
 

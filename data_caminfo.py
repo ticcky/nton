@@ -1,9 +1,10 @@
+import itertools
+import json
 import numpy as np
 import random
 import string
 import os
 import re
-import itertools
 
 from caminfo_tools import data_dstc2
 import local_config as config
@@ -1163,9 +1164,8 @@ class DataCamInfo(object):
                     system = self._replace_entities(system)
                     user = self._replace_entities(user)
 
-                    res.append((system, user, ))
-
-
+                    if user and system:
+                      res.append((system, user, ))
 
                 res = tuple(res)
 
@@ -1216,16 +1216,13 @@ class DataCamInfo(object):
 def main():
     vocab = set()
     db = DataCamInfo()
-    for x in db.gen_data(single_pass=True):
-        print " ".join(x[0]), "\t",  "A:", " ".join(x[1])
+    for dialog in db.gen_data(single_pass=True):
+        for turn in dialog:
+            for utterance in turn:
+              map(vocab.add, utterance.split())
 
+    print json.dumps(sorted(vocab))
 
-        #for i in x:
-        #    map(vocab.add, i.split())
-
-    #print list(sorted(vocab))
-    #print len(db.get_vocab())
-    #print db.get_db()
 
 
 if __name__ == '__main__':

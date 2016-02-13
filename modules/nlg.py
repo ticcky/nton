@@ -25,7 +25,7 @@ class NLG(ParametrizedBlock):
 
         external_inputs = tuple(input_iter)
 
-        assert len(external_inputs) % 3 == 0, 'We want 1 tracker, db, slu for each slot.'
+        #assert len(external_inputs) % 3 == 0, 'We want 1 tracker, db, slu for each slot.'
 
         h_tm1, c_tm1 = self.lstm.get_init()
         c_tm1[:] = s_prime
