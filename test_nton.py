@@ -11,101 +11,109 @@ from data_caminfo import DataCamInfo
 
 
 class TestNTON(unittest.TestCase):
-    def test(self):
-        db_data = DataCamInfo()
+  def setUp(self):
+    self.db_data = db_data = DataCamInfo()
 
-        db_keys = ["area", "food",]
-        db_content = db_data.get_db_for(db_keys, "id")
+    db_keys = ["area", "food", ]
+    db_content = db_data.get_db_for(db_keys, "id")
 
-        db_content_name = db_data.get_db_for(["id"], "name")
-        db_content_phone = db_data.get_db_for(["id"], "phone")
-        db_content_price = db_data.get_db_for(["id"], "pricerange")
+    db_content_name = db_data.get_db_for(["id"], "name")
+    db_content_phone = db_data.get_db_for(["id"], "phone")
+    db_content_price = db_data.get_db_for(["id"], "pricerange")
 
-        vocab = Vocab()
-        vocab.add('<start>')
-        db_mapping = [
-            vocab.add("<slu_area>"),
-            vocab.add("<slu_food>"),
-            vocab.add("<tr_area>"),
-            vocab.add("<tr_food>"),
-            vocab.add("<db_name>"),
-            vocab.add("<db_phone>"),
-            vocab.add("<db_pricerange>"),
-        ]
-        entry_vocab = Vocab(no_oov_eos=True)
+    vocab = Vocab()
+    vocab.add('<start>')
+    vocab.add('word1')
+    vocab.add('word2')
+    vocab.add('word3')
+    vocab.add('word4')
+    db_mapping = [
+      vocab.add("<slu_area>"),
+      vocab.add("<slu_food>"),
+      vocab.add("<tr_area>"),
+      vocab.add("<tr_food>"),
+      vocab.add("<db_name>"),
+      vocab.add("<db_phone>"),
+      vocab.add("<db_pricerange>"),
+    ]
+    entry_vocab = Vocab(no_oov_eos=True)
 
-        for key, val in db_content:
-            for key_part in key:
-                vocab.add(key_part)
-            entry_vocab.add(val)
+    for key, val in db_content:
+      for key_part in key:
+        vocab.add(key_part)
+      entry_vocab.add(val)
 
-        for cont in [db_content_phone, db_content_name, db_content_price]:
-            for key, val in cont:
-                vocab.add(val)
+    for cont in [db_content_phone, db_content_name, db_content_price]:
+      for key, val in cont:
+        vocab.add(val)
 
-        dialogs = []
-        for _, dialog in zip(range(5), db_data.gen_data()):
-            dialogs.append(dialog)
+    self.nton = nton = NTON(n_cells=5,
+                            mgr_h_dims=5,
+                            n_db_keys=len(db_keys),
+                            db_index=db_content,
+                            db_contents=[db_content_name, db_content_phone,
+                                         db_content_price],
+                            db_mapping=db_mapping,
+                            vocab=vocab,
+                            index_vocab=entry_vocab)
 
-            for sys, usr in dialog:
-                for word in sys.split() + usr.split():
-                    vocab.add(word)
+  def test_get_labels(self):
+    labels = self.nton.get_labels([('word1 word2 word3 word4', ''), ('word4 word1', '')])
+    self.assertEqual(labels, [[self.nton.vocab['word1'], self.nton.vocab['word2'], self.nton.vocab['word3'], self.nton.vocab['word4']], [self.nton.vocab['word4'], self.nton.vocab['word1']]])
 
-        nton = NTON(n_cells=5,
-                    mgr_h_dims=5,
-                    n_db_keys=len(db_keys),
-                    db_index=db_content,
-                    db_contents=[db_content_name, db_content_phone, db_content_price],
-                    db_mapping=db_mapping,
-                    vocab=vocab,
-                    index_vocab=entry_vocab)
+  def test(self):
+    dialogs = []
+    for _, dialog in zip(range(5), self.db_data.gen_data()):
+      dialogs.append(dialog)
 
-        for dialog in dialogs:
-            print 'Dialog 1'
-            (res, res_aux, ) = nton.forward_dialog(dialog)
-            dres = []
-            for var in res:
-                dres.append(np.random.randn(*var.shape))
-            nton.backward(res_aux, tuple(dres))
+      for sys, usr in dialog:
+        for word in sys.split() + usr.split():
+          self.vocab.add(word)
 
-        curr_dialog = 0
+    for dialog in dialogs:
+      print 'Dialog 1'
+      (res, res_aux,) = self.nton.forward_dialog(dialog)
+      dres = []
+      for var in res:
+        dres.append(np.random.randn(*var.shape))
+      self.nton.backward(res_aux, tuple(dres))
 
-        def gen_input():
-            num_turns = np.random.randint(1, 2)
-            dialog = []
-            for turn in range(num_turns):
-                n_words_system = np.random.randint(1, 2)
-                dialog.append(np.random.randn(n_words_system, len(nton.vocab)))
+    curr_dialog = 0
 
-                n_words_user = np.random.randint(1, 2)
-                dialog.append(np.random.randn(n_words_user, len(nton.vocab)))
-            print 'getting dialog'
-            return dialog
+    def gen_input():
+      num_turns = np.random.randint(1, 2)
+      dialog = []
+      for turn in range(num_turns):
+        n_words_system = np.random.randint(1, 2)
+        dialog.append(np.random.randn(n_words_system, len(self.nton.vocab)))
 
-        # self.assertTrue(
-        #     check_finite_differences(
-        #         nton.forward,
-        #         nton.backward,
-        #         gen_input_fn=gen_input,
-        #         aux_only=True
-        #     )
-        # )
+        n_words_user = np.random.randint(1, 2)
+        dialog.append(np.random.randn(n_words_user, len(self.nton.vocab)))
+      print 'getting dialog'
+      return dialog
 
-        TestParamGradInLayer.check_layers_params(
-            nton,
-            gen_input(),
-            self.assertTrue
-        )
+    # self.assertTrue(
+    #     check_finite_differences(
+    #         nton.forward,
+    #         nton.backward,
+    #         gen_input_fn=gen_input,
+    #         aux_only=True
+    #     )
+    # )
 
-
+    TestParamGradInLayer.check_layers_params(
+        self.nton,
+        gen_input(),
+        self.assertTrue
+    )
 
 
 if __name__ == '__main__':
-    import random
-    import util
-    util.pdb_on_error()
-    random.seed(0)
-    np.random.seed(0)
+  import random
+  import util
 
-    unittest.main()
+  util.pdb_on_error()
+  random.seed(0)
+  np.random.seed(0)
 
+  unittest.main()

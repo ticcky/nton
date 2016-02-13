@@ -12,3 +12,4 @@ from switch import *
 from concat import *
 from dbmap import *
 from sum import *
+from seq_loss import *

@@ -13,7 +13,6 @@ from nn.attention import Attention
 from nn.switch import Switch
 import modules
 from dbn import DBN
-from seq_loss import SeqLoss
 from data_caminfo import DataCamInfo
 import metrics
 
@@ -42,6 +41,13 @@ class NTON(ParametrizedBlock):
         )
 
         self.print_widths = defaultdict(dict)
+
+    def get_labels(self, dialog):
+        res = []
+        for sys, usr in dialog:
+            res.append(map(self.vocab.get, sys.split()))
+
+        return res
 
     def forward_dialog(self, dialog):
         num_dialog = []
