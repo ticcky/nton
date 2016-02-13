@@ -1,4 +1,6 @@
 import numpy as np
+import logging
+logging.basicConfig(level=logging.INFO)
 
 
 def check_finite_differences(fwd_fn, bwd_fn, delta=1e-5, n_times=10, gen_input_fn=None, test_inputs=(0, ), test_outputs=None, aux_only=True):
@@ -113,6 +115,7 @@ class TestParamGradInLayer:
     @staticmethod
     def check_layers_params(layer, test_input, assert_true_fn):
         for param_name in layer.params.var_names:
+            logging.info("Testing parameter: %s", param_name)
             aux_layer = TestParamGradInLayer(layer, param_name, test_input)
             assert_true_fn(check_finite_differences(
                 aux_layer.forward,

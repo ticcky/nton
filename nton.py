@@ -85,7 +85,6 @@ class NTON(ParametrizedBlock):
             db_count_aux.append(db_count_t_aux)
 
             # 2. Generate system's output.
-            print len(db_t), len(tr_tm1), len(nlu_tm1)
             ((O_hat_t, ), O_hat_t_aux) = self.nlg.forward((s_tm1, O_t, 0, ) + db_t + tr_tm1 + nlu_tm1)
             O_hat_t_aux['lens'] = (len(db_t), len(tr_tm1), len(nlu_tm1), )
 

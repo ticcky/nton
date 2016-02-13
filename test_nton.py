@@ -71,24 +71,30 @@ class TestNTON(unittest.TestCase):
         curr_dialog = 0
 
         def gen_input():
-            num_turns = np.random.randint(2, 6)
+            num_turns = np.random.randint(1, 2)
             dialog = []
             for turn in range(num_turns):
-                n_words_system = np.random.randint(4, 8)
+                n_words_system = np.random.randint(1, 2)
                 dialog.append(np.random.randn(n_words_system, len(nton.vocab)))
 
-                n_words_user = np.random.randint(4, 8)
+                n_words_user = np.random.randint(1, 2)
                 dialog.append(np.random.randn(n_words_user, len(nton.vocab)))
             print 'getting dialog'
             return dialog
 
-        self.assertTrue(
-            check_finite_differences(
-                nton.forward,
-                nton.backward,
-                gen_input_fn=gen_input,
-                aux_only=True
-            )
+        # self.assertTrue(
+        #     check_finite_differences(
+        #         nton.forward,
+        #         nton.backward,
+        #         gen_input_fn=gen_input,
+        #         aux_only=True
+        #     )
+        # )
+
+        TestParamGradInLayer.check_layers_params(
+            nton,
+            gen_input(),
+            self.assertTrue
         )
 
 
