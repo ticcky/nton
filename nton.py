@@ -5,7 +5,7 @@ import time
 import numpy as np
 from numpy.linalg import norm
 
-
+import nn
 from nn import (LSTM, OneHotFromVocab, Sequential, LinearLayer, Softmax, Sigmoid, Vars,
                 ParametrizedBlock, VanillaSGD, Adam, Embeddings, LearnableInput,
                 ReLU, Sum, OneHot)
@@ -25,6 +25,9 @@ class NTON(ParametrizedBlock):
         self.n_cells = n_cells
 
         self.vocab = vocab
+        nn.DEBUG.vocab = vocab
+        nn.DEBUG.db_mapping = db_mapping
+
         self.n_db_keys = n_db_keys
         vocab_size = len(vocab)
 
@@ -32,12 +35,23 @@ class NTON(ParametrizedBlock):
         self.mgr = modules.Manager(n_cells, n_cells, 1, mgr_h_dims)
         self.nlu = modules.NLU(n_cells, vocab_size, self.n_db_keys)
         self.nlg = modules.NLG(vocab_size, n_cells, db_mapping)
-        self.tracker = modules.Tracker(n_cells, n_cells)
+        self.trackers = modules.TrackerSet(n_cells, n_cells, self.n_db_keys)
+        #self.tracker = modules.Tracker(n_cells, n_cells)
         self.dbset = modules.DBSet(db_index, db_contents, vocab, index_vocab)
+
+        extra_params = dict(
+            mgr_init_state=self.mgr.get_zero_state()
+        )
+
+        extra_grads = dict(
+            mgr_init_state=self.mgr.get_zero_state()
+        )
 
         self.parametrize_from_layers(
             [self.mgr, self.nlu, self.nlg, self.tracker],
-            ["mgr", "nlu", "nlg", "tracker"]
+            ["mgr", "nlu", "nlg", "tracker"],
+            extra_params=extra_params,
+            extra_grads=extra_grads
         )
 
         self.print_widths = defaultdict(dict)
@@ -66,7 +80,7 @@ class NTON(ParametrizedBlock):
         :param dialog:
         :return:
         """
-        s_tm1 = self.mgr.init_state()
+        s_tm1 = self.params['mgr_init_state']
         tr_tm1 = tuple(np.ones((len(self.vocab), )) for _ in range(self.n_db_keys))
         nlu_tm1 = tuple(np.zeros((len(self.vocab), )) for _ in range(self.n_db_keys))
 
@@ -87,8 +101,8 @@ class NTON(ParametrizedBlock):
             db_count_aux.append(db_count_t_aux)
 
             # 2. Generate system's output.
-            ((O_hat_t, ), O_hat_t_aux) = self.nlg.forward((s_tm1, O_t, 0, ) + db_t + tr_tm1 + nlu_tm1)
-            O_hat_t_aux['lens'] = (len(db_t), len(tr_tm1), len(nlu_tm1), )
+            ((O_hat_t, ), O_hat_t_aux) = self.nlg.forward((s_tm1, O_t, 0, ) + nlu_tm1 + tr_tm1 + db_t)
+            O_hat_t_aux['lens'] = (len(nlu_tm1), len(tr_tm1), len(db_t), )
 
             # 3. Process what the user said.
             (nlu_t, nlu_t_aux) = self.nlu.forward((I_t, ))
@@ -133,8 +147,9 @@ class NTON(ParametrizedBlock):
 
     def backward(self, aux, dO_hat):
         res = []
-        ds_t = self.mgr.init_state()
+        ds_tp1 = np.zeros_like(self.params['mgr_init_state'])
         dtr_tp1 = tuple(np.zeros((len(self.vocab), )) for _ in range(self.n_db_keys))
+        dnlu_tp1 = tuple(np.zeros((len(self.vocab), )) for _ in range(self.n_db_keys))
 
         n_steps = 0
         items = reversed(zip(
@@ -150,47 +165,46 @@ class NTON(ParametrizedBlock):
         for (sys, usr), dO_hat_t, dO_hat_t_aux, ddb_res_t_aux, ddb_count_t_aux, dnlu_t_aux, dtr_t_aux, ds_t_aux in items:
             n_steps += 1
             dh_t_lst = []
-            ds_tm1_lst = []
-            (ds_tm1, dh_t, ddb_count_t, ) = self.mgr.backward(ds_t_aux, (ds_t, ))
+            d_st_lst = []
+            (ds_t, dh_t, ddb_count_t, ) = self.mgr.backward(ds_t_aux, (ds_tp1, ))
+            d_st_lst.append(ds_t)
             dh_t_lst.append(dh_t)
-            ds_tm1_lst.append(ds_tm1)
 
             dtr_tm1_lst = []
             dtr_tm1 = []
-            dnlu_t = []
-            for dtr_tp1_i, dtr_t_i_aux in zip(dtr_tp1, dtr_t_aux):
-                (dtr_t_i, dnlu_t_i, dh_t, ds_tm1, ) = self.tracker.backward(dtr_t_i_aux, (dtr_tp1_i, ))
+            dnlu_t_lst = []
+            for dtr_tp1_i, dtr_t_i_aux, dnlu_tp1_i in zip(dtr_tp1, dtr_t_aux, dnlu_tp1):
+                (dtr_t_i, dnlu_t_i, dh_t, ds_t, ) = self.tracker.backward(dtr_t_i_aux, (dtr_tp1_i, ))
                 dtr_tm1.append(dtr_t_i)
-                dnlu_t.append(dnlu_t_i)
+                dnlu_t_lst.append(dnlu_t_i + dnlu_tp1_i)
                 dh_t_lst.append(dh_t)
-                ds_tm1_lst.append(ds_tm1)
+                d_st_lst.append(ds_t)
             dtr_tm1_lst.append(dtr_tm1)
 
-            (dI_t, ) = self.nlu.backward(dnlu_t_aux, (sum(dh_t_lst), ) + tuple(dnlu_t))
+            (dI_t, ) = self.nlu.backward(dnlu_t_aux, (sum(dh_t_lst), ) + tuple(dnlu_t_lst))
+
+            # NLG.
             dnlg = self.nlg.backward(dO_hat_t_aux, (dO_hat_t,))
-            lens = dO_hat_t_aux['lens']
+            ds_t, dO_t = dnlg[:2]
+            dnlu_tp1, dtr_tm1, ddb_t = self._unwrap(dnlg[3:], dO_hat_t_aux['lens'])
+            d_st_lst.append(ds_t)
+            dtr_tm1_lst.append(dtr_tm1)
 
             (ddb_dist_t, ) = Sum.backward(ddb_count_t_aux, (ddb_count_t, ))
 
-            ds_tm1, dO_t = dnlg[:2]
-            ds_tm1_lst.append(ds_tm1)
-            ddb_t, dtr_tm1, dslu = self._unwrap(dnlg[3:], lens)
-            dtr_tm1_lst.append(dtr_tm1)
-
             ddb_res_t = (ddb_dist_t, ) + ddb_t
-
             dtr_tm1 = self.dbset.backward(ddb_res_t_aux, ddb_res_t)
             dtr_tm1_lst.append(dtr_tm1)
 
-            ds_t = sum(ds_tm1_lst)
-            #import ipdb; ipdb.set_trace()
+            ds_tp1 = sum(d_st_lst)
             dtr_tp1 = tuple(np.zeros((len(self.vocab), )) for _ in range(self.n_db_keys))
             for dtr_tp1_i, dtr_tp1_is in zip(dtr_tp1, zip(*dtr_tm1_lst)):
-                dtr_tp1_i = sum(dtr_tp1_is)
+                dtr_tp1_i[:] = sum(dtr_tp1_is)
 
             res.append(dI_t)
             res.append(dO_t)
 
+        self.grads['mgr_init_state'] += ds_tp1
         assert len(aux['dialog_turns']) == n_steps
 
         return res[::-1]
@@ -235,3 +249,6 @@ class NTON(ParametrizedBlock):
 
         return (x_q, x_a)
 
+
+
+# Why does tracker have just 1 set of parameters?

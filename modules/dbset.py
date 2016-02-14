@@ -1,8 +1,8 @@
-from nn import Block, Vars
+import nn
 from db_dist import DBDist
 
 
-class DBSet(Block):
+class DBSet(nn.Block):
     def __init__(self, index_content, contents, vocab, entry_vocab):
         self.index_db = DBDist(index_content, vocab, entry_vocab)
 
@@ -15,13 +15,14 @@ class DBSet(Block):
         assert len(inputs) == self.index_db.n, "Len inputs: %d, index_db.n: %d" % (len(inputs), self.index_db.n,)
 
         ((entry_dist, ), entry_dist_aux) = self.index_db.forward(inputs)
+        nn.DEBUG.add_db_entry_dist(entry_dist)
 
         res = []; res_aux = []
         for content_db in self.content_dbs:
             ((db_val, ), db_val_aux) = content_db.forward((entry_dist, ))
             res.append(db_val); res_aux.append(db_val_aux)
 
-        return ((entry_dist, ) + tuple(res), Vars(
+        return ((entry_dist, ) + tuple(res), nn.Vars(
             res=res_aux,
             entry_dist=entry_dist_aux
         ))

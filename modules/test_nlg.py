@@ -52,7 +52,14 @@ class TestNLG(unittest.TestCase):
 
             return (s_prime, y_in, y_steps, ) + tuple(other_inputs)
 
-        mapping = [5, 6, 7, 8, 9, 10]
+        mapping = [
+            vocab_full.get('#db1'),
+            vocab_full.get('#db2'),
+            vocab_full.get('#tr1'),
+            vocab_full.get('#tr2'),
+            vocab_full.get('#slu1'),
+            vocab_full.get('#slu2'),
+        ]
 
         inputs = gen_input()
 

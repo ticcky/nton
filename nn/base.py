@@ -14,7 +14,7 @@ class ParametrizedBlock(Block):
         self._params = params
         self._grads = grads
 
-    def parametrize_from_layers(self, layers, layer_names):
+    def parametrize_from_layers(self, layers, layer_names, extra_params=None, extra_grads=None):
         assert len(layers) == len(layer_names)
         params = {}
         grads = {}
@@ -26,6 +26,14 @@ class ParametrizedBlock(Block):
                     grads[key] = layer.grads[param_name]
             else:
                 assert False, "Layer is not a ParametrizedBlock. Perhaps error?"
+
+        if extra_params:
+          assert extra_grads
+          assert not set(params.keys()).intersection(extra_params.keys())
+          assert set(extra_params.keys()) == set(extra_grads.keys())
+
+          params.update(extra_params)
+          grads.update(extra_grads)
 
         self.parametrize(Vars(**params), Vars(**grads))
 

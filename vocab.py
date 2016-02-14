@@ -43,3 +43,7 @@ class Vocab(dict):
                 res.append(self[self.oov_token])
 
         return np.array(res)
+
+    def decode_word(self, vector):
+        word_id = np.argmax(vector)
+        return self.rev(word_id)

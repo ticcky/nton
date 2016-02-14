@@ -23,6 +23,8 @@ class TestDBMap(unittest.TestCase):
         mass = x[0] + x[5] + x[9]
         y_true = x[0] * db1 + x[5] * db2 + x[9] * db3 + (1 - mass) * x
 
+        import ipdb; ipdb.set_trace()
+
         self.assertTrue(np.allclose(y, y_true))
 
     def test_backward(self):

@@ -17,8 +17,8 @@ class Manager(ParametrizedBlock):
             [self.mlp_update], ["mlp_update"]
         )
 
-    def init_state(self):
-        return np.zeros((self.state_size, ))
+    def get_zero_state(self):
+        return np.zeros((self.state_size,))
 
     def forward(self, (s, h_t, db_count, )):
         ((mlp_in, ), mlp_in_aux, ) = Concat.forward((s, h_t, db_count, ))

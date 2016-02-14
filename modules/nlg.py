@@ -1,5 +1,6 @@
 import numpy as np
 
+import nn
 from nn import ParametrizedBlock, Vars, Sequential, LinearLayer, Softmax, LSTM, DBMap
 
 
@@ -19,16 +20,22 @@ class NLG(ParametrizedBlock):
     def forward(self, inputs):
         input_iter = iter(inputs)
 
-        s_prime = next(input_iter)
+        s_t = next(input_iter)
         y_in = next(input_iter)
         y_steps = next(input_iter)
 
         external_inputs = tuple(input_iter)
 
+        dbg_state = []
+        for i, (db_map_i, input) in enumerate(zip(nn.DEBUG.db_mapping, external_inputs)):
+            dbg_state.append("%s=%s" % (nn.DEBUG.vocab.rev(db_map_i), nn.DEBUG.vocab.rev(np.argmax(input))))
+        nn.DEBUG.add_nlg_external_input(", ".join(dbg_state))
+
         #assert len(external_inputs) % 3 == 0, 'We want 1 tracker, db, slu for each slot.'
 
         h_tm1, c_tm1 = self.lstm.get_init()
-        c_tm1[:] = s_prime
+        c_tm1[:] = s_t
+        #h_tm1[:] = s_t
 
         o_star_t = None
         O = []
@@ -36,7 +43,7 @@ class NLG(ParametrizedBlock):
         O_star_aux = []
         H_aux = []
         o_star_t_used = []
-        for y_in_t in tuple(y_in) + (None, ) * y_steps:
+        for t, y_in_t in enumerate(tuple(y_in) + (None, ) * y_steps):
             if type(y_in_t) != np.ndarray:
                 assert type(o_star_t) == np.ndarray
                 y_in_t = o_star_t
@@ -52,6 +59,9 @@ class NLG(ParametrizedBlock):
             O_star_aux.append(o_star_t_aux)
 
             ((o_t, ), o_t_aux) = self.db_map.forward((o_star_t, ) + external_inputs)
+
+            #if np.argmax(o_t) == nn.DEBUG.vocab['<tr_food>']:
+            #  import ipdb; ipdb.set_trace()
 
             O.append(o_t)
             O_aux.append(o_t_aux)
@@ -71,8 +81,8 @@ class NLG(ParametrizedBlock):
     def backward(self, aux, (dO, )):
         lst_dexternal_inputs = []
         lst_dy_in = []
-        dh_tm1 = 0.0
-        dc_tm1 = 0.0
+        dh_tp1 = 0.0
+        dc_tp1 = 0.0
         dy_in_t = 0.0
         for do_t, o_t_aux, o_star_t_aux, o_star_t_used, h_t_aux in reversed(zip(dO, aux['o_t'], aux['o_star_t'], aux['o_star_t_used'], aux['h_t'])):
             ddb_map_inputs = self.db_map.backward(o_t_aux, (do_t, ))
@@ -82,10 +92,10 @@ class NLG(ParametrizedBlock):
             lst_dexternal_inputs.append(ddb_map_inputs[1:])
 
             (dh_t, ) = self.h_to_o.backward(o_star_t_aux, (do_star_t, ))
-            dh_t = dh_t[np.newaxis, np.newaxis, :] + dh_tm1
-            dc_t = np.zeros_like(dh_t) + dc_tm1
+            dh_t = dh_t[np.newaxis, np.newaxis, :] + dh_tp1
+            dc_t = np.zeros_like(dh_t) + dc_tp1
 
-            (dy_in_t, dh_tm1, dc_tm1) = self.lstm.backward(h_t_aux, (dh_t, dc_t, ))
+            (dy_in_t, dh_tp1, dc_tp1) = self.lstm.backward(h_t_aux, (dh_t, dc_t, ))
             dy_in_t = dy_in_t[0][0]
             lst_dy_in.append(dy_in_t)
 
@@ -93,5 +103,5 @@ class NLG(ParametrizedBlock):
 
         dy_in = np.array(list(reversed(lst_dy_in[-aux['y_in_len']:])))
 
-        return (dc_tm1[0], dy_in, None) + dexternal_inputs
+        return (dc_tp1[0], dy_in, None) + dexternal_inputs
 

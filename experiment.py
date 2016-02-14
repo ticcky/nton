@@ -5,6 +5,7 @@ import collections
 import json
 import logging
 import random
+import time
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -116,16 +117,21 @@ class Experiment(object):
     test_wers = []
     test_accs = []
     eval_index = []
+    last_print = 0.0
     while True:
       self.example_number +=1
       train_dialog = next(self.data_train)
       training_dialog_labels = self.nton_inst.get_labels(train_dialog)
-      logging.info("Next dialog. First user utterance: %s", train_dialog[0][1][:20])
 
       self.nton_inst.grads.zero()
+      nn.DEBUG.new_dialog(train_dialog, training_dialog_labels)
 
       (O_hat, O_hat_aux) = self.nton_inst.forward_dialog(train_dialog)
-      self.print_step(train_dialog, training_dialog_labels, O_hat)
+
+      if time.time() - last_print > 5.0:
+        logging.info("Next dialog. First user utterance: %s", train_dialog[0][1][:20])
+        self.print_step(train_dialog, training_dialog_labels, O_hat)
+        last_print = time.time()
 
       dO_hat = []
       for O_hat_t, O_t in zip(O_hat, training_dialog_labels):
@@ -138,13 +144,15 @@ class Experiment(object):
 
   def print_step(self, train_dialog, O, O_hat):
     utterance_accuracy = []
-    logging.info('##################### Example %d ####################', self.example_number)
+    logging.info(C.RED + '##################### Example %d ####################' + C.END, self.example_number)
     logging.info('Decoded output:')
-    for (sys, usr,), O_hat_t, O_t in zip(train_dialog, O_hat, O):
+    for (sys, usr,), O_hat_t, O_t, DEBUG_external_input, DEBUG_entry_dist in zip(train_dialog, O_hat, O, nn.DEBUG.get_nlg_external_input(), nn.DEBUG.get_db_entry_dist()):
       O_hat_t = O_hat_t[:-1]
       utterance = np.zeros(len(O_hat_t))
+      utterance_scores = np.zeros(len(O_hat_t))
       for i, O_hat_t_i in enumerate(O_hat_t):
         utterance[i] = np.argmax(O_hat_t_i)
+        utterance_scores[i] = O_hat_t_i[utterance[i]]
 
       utterance_accuracy.append(np.sum(utterance == O_t) * 1.0 / len(O_t))
 
@@ -152,9 +160,15 @@ class Experiment(object):
       utterance_true = sys.split()
       utterance_word_lengths = [max(len(w1), len(w2)) for w1, w2 in zip(utterance, utterance_true)]
 
-      logging.info(C.RED + '   System [Pred]: %s' + C.END, ' '.join(('%%%ds' % wlen) % w for w, wlen in zip(utterance, utterance_word_lengths)))
-      logging.info('   System [True]: %s', ' '.join(('%%%ds' % wlen) % w for w, wlen in zip(utterance_true, utterance_word_lengths)))
-      logging.info('   User:          %s', usr)
+      logging.info(C.BOLD +    '   System [Pred]: %s' + C.END, ' '.join(('%%%ds' % wlen) % w for w, wlen in zip(utterance, utterance_word_lengths)[:16]))
+      logging.info(C.BLUE + '   System [Scor]: %s' + C.END, ' '.join(('%%%d.3f' % wlen) % w for w, wlen in zip(utterance_scores, utterance_word_lengths)[:16]))
+      DEBUG_external_input = DEBUG_external_input.split(', ')
+      logging.info(           '          %s',  ', '.join(DEBUG_external_input[:3]))
+      logging.info(           '          %s',  ', '.join(DEBUG_external_input[3:6]))
+      logging.info(           '            Entry dist: %.2f (%d)', np.sum(DEBUG_entry_dist), np.argmax(DEBUG_entry_dist))
+      logging.info(           '          %s',  ', '.join(DEBUG_external_input[6:]))
+      logging.info('   System [True]: %s', ' '.join(('%%%ds' % wlen) % w for w, wlen in zip(utterance_true, utterance_word_lengths)[:16]))
+      logging.info(C.BOLD + '   User:          %s' + C.END, usr)
       logging.info('')
 
     mean_utterance_accuracy = np.mean(utterance_accuracy)
