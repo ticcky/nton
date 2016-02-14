@@ -57,3 +57,23 @@ class ReLU(Block):
         res = (y > 0) * dy
 
         return (res, )
+
+class Normalize(Block):
+    @classmethod
+    def forward(self, (x,)):
+        xsum = np.sum(x)
+        y = x / xsum
+        aux = Vars(
+            x=x,
+            xsum=xsum
+        )
+
+        return ((y,), aux)
+
+    @classmethod
+    def backward(self, aux, (dy,)):
+        base = np.sum((- dy * aux['x']) / (aux['xsum'] ** 2))
+
+        res = base + dy / aux['xsum']
+
+        return (res, )
