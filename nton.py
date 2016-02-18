@@ -48,8 +48,8 @@ class NTON(ParametrizedBlock):
         )
 
         self.parametrize_from_layers(
-            [self.mgr, self.nlu, self.nlg, self.tracker],
-            ["mgr", "nlu", "nlg", "tracker"],
+            [self.mgr, self.nlu, self.nlg, self.trackers],
+            ["mgr", "nlu", "nlg", "tr"],
             extra_params=extra_params,
             extra_grads=extra_grads
         )
@@ -81,7 +81,7 @@ class NTON(ParametrizedBlock):
         :return:
         """
         s_tm1 = self.params['mgr_init_state']
-        tr_tm1 = tuple(np.ones((len(self.vocab), )) for _ in range(self.n_db_keys))
+        tr_tm1 = tuple(np.ones((len(self.vocab), )) * 0.01 for _ in range(self.n_db_keys))
         nlu_tm1 = tuple(np.zeros((len(self.vocab), )) for _ in range(self.n_db_keys))
 
         res = []
@@ -101,7 +101,9 @@ class NTON(ParametrizedBlock):
             db_count_aux.append(db_count_t_aux)
 
             # 2. Generate system's output.
-            ((O_hat_t, ), O_hat_t_aux) = self.nlg.forward((s_tm1, O_t, 0, ) + nlu_tm1 + tr_tm1 + db_t)
+            ((O_t_start, ), _) = self.one_hot.forward((("<start>", ), ))
+            ((O_hat_t, ), O_hat_t_aux) = self.nlg.forward((s_tm1, O_t_start, len(O_t) - 1, ) + nlu_tm1 + tr_tm1 + db_t)
+            #((O_hat_t, ), O_hat_t_aux) = self.nlg.forward((s_tm1, O_t, 0, ) + nlu_tm1 + tr_tm1 + db_t)
             O_hat_t_aux['lens'] = (len(nlu_tm1), len(tr_tm1), len(db_t), )
 
             # 3. Process what the user said.
@@ -109,12 +111,7 @@ class NTON(ParametrizedBlock):
             h_t = nlu_t[0]
 
             # 4. Update tracker.
-            tr_t = []  # For each slot, update the tracker's state.
-            tr_t_aux = []
-            for tr_tm1_i, nlu_t_i in zip(tr_tm1, nlu_t[1:]):
-                ((tr_t_i, ), tr_t_i_aux) = self.tracker.forward((tr_tm1_i, nlu_t_i, h_t, s_tm1, ))
-                tr_t.append(tr_t_i)
-                tr_t_aux.append(tr_t_i_aux)
+            (tr_t, tr_t_aux) = self.trackers.forward((h_t, s_tm1, ) + tuple(tr_tm1) + tuple(nlu_t[1:]))
 
             # 5. Update dialog state.
             ((s_t, ), s_t_aux) = self.mgr.forward((s_tm1, h_t, db_count_t, ))
@@ -170,16 +167,14 @@ class NTON(ParametrizedBlock):
             d_st_lst.append(ds_t)
             dh_t_lst.append(dh_t)
 
+            # Trackers.
             dtr_tm1_lst = []
-            dtr_tm1 = []
-            dnlu_t_lst = []
-            for dtr_tp1_i, dtr_t_i_aux, dnlu_tp1_i in zip(dtr_tp1, dtr_t_aux, dnlu_tp1):
-                (dtr_t_i, dnlu_t_i, dh_t, ds_t, ) = self.tracker.backward(dtr_t_i_aux, (dtr_tp1_i, ))
-                dtr_tm1.append(dtr_t_i)
-                dnlu_t_lst.append(dnlu_t_i + dnlu_tp1_i)
-                dh_t_lst.append(dh_t)
-                d_st_lst.append(ds_t)
-            dtr_tm1_lst.append(dtr_tm1)
+            dtrackers = self.trackers.backward(dtr_t_aux, dtr_tp1)
+            dh_t_lst.append(dtrackers[0])
+            d_st_lst.append(dtrackers[1])
+            dtrackers_tr_nlu = dtrackers[2:]
+            dtr_tm1_lst.append(dtrackers_tr_nlu[:len(dtrackers_tr_nlu)/2])
+            dnlu_t_lst = dtrackers_tr_nlu[len(dtrackers_tr_nlu)/2:]
 
             (dI_t, ) = self.nlu.backward(dnlu_t_aux, (sum(dh_t_lst), ) + tuple(dnlu_t_lst))
 

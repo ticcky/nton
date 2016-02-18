@@ -62,7 +62,10 @@ class Normalize(Block):
     @classmethod
     def forward(self, (x,)):
         xsum = np.sum(x)
-        y = x / xsum
+        if xsum > 0:
+          y = x / xsum
+        else:
+          y = x * 0
         aux = Vars(
             x=x,
             xsum=xsum
@@ -72,8 +75,11 @@ class Normalize(Block):
 
     @classmethod
     def backward(self, aux, (dy,)):
-        base = np.sum((- dy * aux['x']) / (aux['xsum'] ** 2))
-
-        res = base + dy / aux['xsum']
+        xsumsq = (aux['xsum'] ** 2)
+        if xsumsq > 0:
+          base = np.sum((- dy * aux['x']) / xsumsq)
+          res = base + dy / aux['xsum']
+        else:
+          res = np.zeros_like(dy)
 
         return (res, )

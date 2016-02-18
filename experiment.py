@@ -160,14 +160,15 @@ class Experiment(object):
       utterance_true = sys.split()
       utterance_word_lengths = [max(len(w1), len(w2)) for w1, w2 in zip(utterance, utterance_true)]
 
-      logging.info(C.BOLD +    '   System [Pred]: %s' + C.END, ' '.join(('%%%ds' % wlen) % w for w, wlen in zip(utterance, utterance_word_lengths)[:16]))
-      logging.info(C.BLUE + '   System [Scor]: %s' + C.END, ' '.join(('%%%d.3f' % wlen) % w for w, wlen in zip(utterance_scores, utterance_word_lengths)[:16]))
+      logging.info(C.BOLD +    '   System [T]: %s', ' '.join(('%%%ds' % wlen) % w for w, wlen in zip(utterance_true, utterance_word_lengths)[:16]))
+      logging.info(            '   System [P]: %s' + C.END, ' '.join(('%%%ds' % wlen) % w for w, wlen in zip(utterance, utterance_word_lengths)[:16]))
+      logging.info(C.BLUE +    '   System [S]: %s' + C.END, ' '.join(('%%%d.3f' % wlen) % w for w, wlen in zip(utterance_scores, utterance_word_lengths)[:16]))
       DEBUG_external_input = DEBUG_external_input.split(', ')
       logging.info(           '          %s',  ', '.join(DEBUG_external_input[:3]))
       logging.info(           '          %s',  ', '.join(DEBUG_external_input[3:6]))
       logging.info(           '            Entry dist: %.2f (%d)', np.sum(DEBUG_entry_dist), np.argmax(DEBUG_entry_dist))
       logging.info(           '          %s',  ', '.join(DEBUG_external_input[6:]))
-      logging.info('   System [True]: %s', ' '.join(('%%%ds' % wlen) % w for w, wlen in zip(utterance_true, utterance_word_lengths)[:16]))
+
       logging.info(C.BOLD + '   User:          %s' + C.END, usr)
       logging.info('')
 

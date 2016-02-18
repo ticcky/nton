@@ -1,5 +1,6 @@
 import numpy as np
 
+import nn
 from nn import Block, Vars
 
 
@@ -23,8 +24,11 @@ class DBMap(Block):
         res = np.zeros_like(x)
 
         mapped_mass = 0.0
+        norm_aux_lst = []
         for x_dim, db_res in zip(self.mapping, db):
-            res += x[x_dim] * db_res
+            ((db_res_norm,), db_res_norm_aux) = nn.Normalize.forward((db_res,))
+            norm_aux_lst.append(db_res_norm_aux)
+            res += x[x_dim] * db_res_norm
 
             mapped_mass += x[x_dim]
 
@@ -34,7 +38,8 @@ class DBMap(Block):
             n_inputs = len(inputs),
             x=x,
             db=db,
-            mapped_mass=mapped_mass
+            mapped_mass=mapped_mass,
+            norm_aux_lst=norm_aux_lst
         )
 
         return ((res, ), aux)
@@ -46,9 +51,11 @@ class DBMap(Block):
 
         dx = dy.copy() * (1 - mapped_mass)
         ddbs = []
-        for db_res, x_dim in zip(db, self.mapping):
+        for db_res, x_dim, norm_aux in zip(db, self.mapping, aux['norm_aux_lst']):
             ddb = dy.copy()
             ddb *= x[x_dim]
+
+            (ddb,) = nn.Normalize.backward(norm_aux, (ddb,))
 
             ddbs.append(ddb)
 

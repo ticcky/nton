@@ -18,8 +18,9 @@ class TrackerSet(nn.ParametrizedBlock):
 
     h_t = inputs[0]
     s = inputs[1]
-    tracker_input_tr = inputs[2::2]
-    tracker_input_slu = inputs[3::2]
+    input_tr_nlu = inputs[2:]
+    tracker_input_tr = input_tr_nlu[:len(input_tr_nlu) / 2]
+    tracker_input_slu = input_tr_nlu[len(input_tr_nlu) / 2:]
 
     assert len(tracker_input_tr) == len(tracker_input_slu)
     assert len(tracker_input_tr) == len(self.trackers)
@@ -44,5 +45,4 @@ class TrackerSet(nn.ParametrizedBlock):
       self.accum_grads((lst_dtr, lst_dslu, lst_dh_t, lst_ds,),
                        tracker.backward(tracker_output_aux, (dtracker_output,)))
 
-    dvals = tuple(val for pair in zip(lst_dtr, lst_dslu) for val in pair)
-    return (sum(lst_dh_t), sum(lst_ds),) + dvals
+    return (sum(lst_dh_t), sum(lst_ds),) + tuple(lst_dtr) + tuple(lst_dslu)
