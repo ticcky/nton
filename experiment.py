@@ -146,7 +146,7 @@ class Experiment(object):
     utterance_accuracy = []
     logging.info(C.RED + '##################### Example %d ####################' + C.END, self.example_number)
     logging.info('Decoded output:')
-    for (sys, usr,), O_hat_t, O_t, DEBUG_external_input, DEBUG_entry_dist in zip(train_dialog, O_hat, O, nn.DEBUG.get_nlg_external_input(), nn.DEBUG.get_db_entry_dist()):
+    for (sys, usr,), O_hat_t, O_t, DEBUG_external_input, DEBUG_entry_dist, DEBUG_db_count in zip(train_dialog, O_hat, O, nn.DEBUG.get_nlg_external_input(), nn.DEBUG.get_db_entry_dist(), nn.DEBUG.get_db_count()):
       O_hat_t = O_hat_t[:-1]
       utterance = np.zeros(len(O_hat_t))
       utterance_scores = np.zeros(len(O_hat_t))
@@ -166,7 +166,7 @@ class Experiment(object):
       DEBUG_external_input = DEBUG_external_input.split(', ')
       logging.info(           '          %s',  ', '.join(DEBUG_external_input[:3]))
       logging.info(           '          %s',  ', '.join(DEBUG_external_input[3:6]))
-      logging.info(           '            Entry dist: %.2f (%d)', np.sum(DEBUG_entry_dist), np.argmax(DEBUG_entry_dist))
+      logging.info(           '            Entry dist: %.2f (%d), DB count: %d', np.sum(DEBUG_entry_dist), np.argmax(DEBUG_entry_dist), DEBUG_db_count)
       logging.info(           '          %s',  ', '.join(DEBUG_external_input[6:]))
 
       logging.info(C.BOLD + '   User:          %s' + C.END, usr)

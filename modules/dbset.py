@@ -1,3 +1,5 @@
+import numpy as np
+
 import nn
 from db_dist import DBDist
 
@@ -15,7 +17,13 @@ class DBSet(nn.Block):
         assert len(inputs) == self.index_db.n, "Len inputs: %d, index_db.n: %d" % (len(inputs), self.index_db.n,)
 
         ((entry_dist, ), entry_dist_aux) = self.index_db.forward(inputs)
+        count = len(entry_dist[entry_dist == np.max(entry_dist)])
+
+        ((entry_dist, ), entry_dist_amplify_aux) = nn.Amplify.forward((entry_dist,))
         nn.DEBUG.add_db_entry_dist(entry_dist)
+
+
+
 
         res = []; res_aux = []
         for content_db in self.content_dbs:
@@ -24,7 +32,9 @@ class DBSet(nn.Block):
 
         return ((entry_dist, ) + tuple(res), nn.Vars(
             res=res_aux,
-            entry_dist=entry_dist_aux
+            entry_dist=entry_dist_aux,
+            entry_dist_amplify=entry_dist_amplify_aux,
+            count=count
         ))
 
     def backward(self, aux, dres):
@@ -35,6 +45,8 @@ class DBSet(nn.Block):
             self.accum_grads((lst_dentry_dist, ), content_db.backward(res_aux, (ddb_val, )))
 
         dentry_dist += sum(lst_dentry_dist)
+
+        (dentry_dist, ) = nn.Amplify.backward(aux['entry_dist_amplify'], (dentry_dist,))
 
         dinputs = self.index_db.backward(aux['entry_dist'], (dentry_dist, ))
 

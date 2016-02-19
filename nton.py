@@ -34,8 +34,8 @@ class NTON(ParametrizedBlock):
     vocab_size = len(vocab)
 
     self.one_hot = OneHotFromVocab(vocab)
-    self.mgr = modules.Manager(n_cells, n_cells, 1, mgr_h_dims)
-    self.nlu = modules.NLU(n_cells, vocab_size, self.n_db_keys)
+    self.mgr = modules.Manager(n_cells, n_cells, 3, mgr_h_dims)
+    self.nlu = modules.NLU2(n_cells, vocab_size, self.n_db_keys)
     self.nlg = modules.NLG(vocab_size, n_cells, db_mapping)
     self.trackers = modules.TrackerSet(n_cells, n_cells, self.n_db_keys)
     # self.tracker = modules.Tracker(n_cells, n_cells)
@@ -101,8 +101,11 @@ class NTON(ParametrizedBlock):
       (db_res_t, db_res_t_aux) = self.dbset.forward(tr_tm1)
       db_dist_t = db_res_t[0];
       db_t = db_res_t[1:]
-      ((db_count_t,), db_count_t_aux) = Sum.forward((db_dist_t,))
+      # TODO:
+      ((_,), db_count_t_aux) = Sum.forward((db_dist_t,))
+      db_count_t = np.array([db_res_t_aux['count']])
       db_count_aux.append(db_count_t_aux)
+      nn.DEBUG.add_db_count(db_count_t)
 
       # 2. Generate system's output.
       ((O_t_start,), _) = self.one_hot.forward((("<start>",),))
@@ -120,7 +123,7 @@ class NTON(ParametrizedBlock):
         (h_t, s_tm1,) + tuple(tr_tm1) + tuple(nlu_t[1:]))
 
       # 5. Update dialog state.
-      ((s_t,), s_t_aux) = self.mgr.forward((s_tm1, h_t, db_count_t,))
+      ((s_t,), s_t_aux) = self.mgr.forward((s_tm1, h_t, db_count_t == 0, db_count_t == 1, db_count_t >= 2))
 
       # Pass current variables to the next step.
       tr_tm1 = tuple(tr_t)
@@ -170,7 +173,7 @@ class NTON(ParametrizedBlock):
       n_steps += 1
       dh_t_lst = []
       d_st_lst = []
-      (ds_t, dh_t, ddb_count_t,) = self.mgr.backward(ds_t_aux, (ds_tp1,))
+      (ds_t, dh_t, ddb_count_t_0, ddb_count_t_1, ddb_count_t_2p) = self.mgr.backward(ds_t_aux, (ds_tp1,))
       d_st_lst.append(ds_t)
       dh_t_lst.append(dh_t)
 
@@ -193,7 +196,9 @@ class NTON(ParametrizedBlock):
       d_st_lst.append(ds_t)
       dtr_tm1_lst.append(dtr_tm1)
 
-      (ddb_dist_t,) = Sum.backward(ddb_count_t_aux, (ddb_count_t,))
+      # TODO:
+      (ddb_dist_t,) = Sum.backward(ddb_count_t_aux, (ddb_count_t_0,))
+      ddb_dist_t = np.zeros_like(ddb_dist_t)
 
       ddb_res_t = (ddb_dist_t,) + ddb_t
       dtr_tm1 = self.dbset.backward(ddb_res_t_aux, ddb_res_t)
@@ -253,3 +258,12 @@ class NTON(ParametrizedBlock):
 
 
     # Why does tracker have just 1 set of parameters?
+
+# Experiments to do:
+#  - try NLU vs NLU2; maybe independent tracking modules will provide easier learning?
+#                     but maybe the slow learning is just because NTON first learns to
+#                     produce simple outputs and only then learns to leverage database
+#                     which is how it should learn tracking etc.
+#  - add features like - does tracker have a value? how many entries in db?
+#  - add more db control - skip one entry, ...
+#  - relax loss function - allow other restaurant matches

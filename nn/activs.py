@@ -83,3 +83,26 @@ class Normalize(Block):
           res = np.zeros_like(dy)
 
         return (res, )
+
+
+class Amplify(Block):
+    @classmethod
+    def forward(self, (x,)):
+        y = np.zeros_like(x)
+        max_index = np.argmax(x)
+        if x[max_index] > 0:
+          y[max_index] = 1
+
+        aux = Vars(
+            max_index=max_index
+        )
+
+        return ((y,), aux)
+
+    @classmethod
+    def backward(cls, aux, (dy,)):
+        dx = np.zeros_like(dy)
+
+        dx[aux['max_index']] = dy[aux['max_index']]
+
+        return (dx,)

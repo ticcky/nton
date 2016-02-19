@@ -65,8 +65,8 @@ class NLG(ParametrizedBlock):
       c_t = c_t[0][0]
       H_aux.append(h_t_aux)
 
-      ((o_star_t,), o_star_t_aux) = self.h_to_o.forward(
-          (h_t,))  # Get RNN LM result.
+      # Get RNN LM result.
+      ((o_star_t,), o_star_t_aux) = self.h_to_o.forward((h_t,))
       O_star_aux.append(o_star_t_aux)
 
       ((o_t,), o_t_aux) = self.db_map.forward((o_star_t,) + external_inputs)
